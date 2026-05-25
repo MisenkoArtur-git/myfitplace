@@ -9,7 +9,7 @@ SECRET_KEY = 'django-insecure-rt$fvrap5$l3t+zi1(ao!r(d0dzee1+bs%^vt10#k_skkjv$ld
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['://onrender.com', '127.0.0.1', 'localhost']
+ALLOWED_HOSTS = ['myfitplace.onrender.com', '127.0.0.1', 'localhost']
 
 # Application definition
 INSTALLED_APPS = [
