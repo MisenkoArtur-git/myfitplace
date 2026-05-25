@@ -1,0 +1,174 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyFit.Place</title>
+    <link rel="stylesheet" href="{% static 'css/index.css' %}">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+    <header class="main-header">
+        <div class="logo-group">
+            <span>MyFit.Place</span>
+            <i data-lucide="dumbbell" class="icon-logo"></i>
+        </div>
+        <nav class="nav-group">
+            <a href="#">About us</a>
+            <a href="#">Home</a>
+            <div class="lang-switch">
+                <i data-lucide="languages" class="icon-small"></i> EN/UA
+            </div>
+            {% if user.is_authenticated %}
+                <a href="/cabinet/" class="btn btn-login">Cabinet</a>
+                <a href="{% url 'logout' %}" class="btn btn-login">Logout</a>
+            {% else %}
+                <button class="btn btn-login" id="open-auth-btn">Login/Sign Up</button>
+            {% endif %}
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero-block">
+            <div class="text-side">
+                <h1 class="title-large">TRAIN HARD. <span class="text-green">LIVE BETTER</span></h1>
+                <p>Train like an athlete with top-tier equipment and expert programming. Whether you're building muscle or breaking PRs, we help you push past limits.</p>
+            </div>
+            <div class="img-side">
+                <img src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1000" alt="Training">
+            </div>
+        </section>
+
+        <section class="hero-block">
+            <div class="img-side">
+                <img src="https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?q=80&w=1000" alt="Mission">
+            </div>
+            <div class="text-side">
+                <h2 class="title-large">OUR MISSION</h2>
+                <p>Our mission is to provide a high-energy, no-nonsense environment where results are forged. We don't do excuses—we do execution.</p>
+            </div>
+        </section>
+
+        <section class="cta-banner-section">
+            <p class="cta-subtitle">WHAT WE BELIEVE IN</p>
+            <h2 class="cta-title">JOIN THE PRIMAL TRIBE TODAY!</h2>
+            <button class="btn btn-white-lg" id="cta-join-btn">JOIN US</button>
+        </section>
+        
+        <!-- Reviews section (full width) placed under CTA -->
+        <section class="reviews-section">
+            <div class="reviews-container">
+                <h2>Reviews</h2>
+                <div class="reviews-list-wrapper">
+                    <div class="reviews-left">
+                        <div class="comments-list" id="comments-list-full"></div>
+                    </div>
+
+                    <aside class="reviews-right">
+                        <div class="comment-input-area">
+                            <div id="comment-stars-full" class="stars-rating" style="display:flex; gap:8px; justify-content:center; margin-bottom:12px;">
+                                <span class="star" data-value="1">★</span>
+                                <span class="star" data-value="2">★</span>
+                                <span class="star" data-value="3">★</span>
+                                <span class="star" data-value="4">★</span>
+                                <span class="star" data-value="5">★</span>
+                            </div>
+                            <input type="hidden" id="comment-rating-full" value="0">
+                            <textarea id="comment-text-full" class="comment-input-large" placeholder="Write your review..."></textarea>
+                            <button id="submit-comment-full" class="btn btn-submit" data-auth="{% if user.is_authenticated %}1{% else %}0{% endif %}">Send</button>
+                            <p class="comments-note">Reviews are moderated and may appear after approval.</p>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="main-footer">
+        <div class="footer-container">
+            <div class="footer-top">
+                <div class="footer-logo">
+                    <i data-lucide="dumbbell" class="icon-footer"></i>
+                    <span>MyFit.Place</span>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <div class="footer-col">
+                    <h4>CONTACT</h4>
+                    <ul>
+                        <li>Email: info@myfit.place</li>
+                        <li>Phone: (096) 555-5555</li>
+                    </ul>
+                </div>
+                <div class="footer-col hours-split">
+                    <h4>OPENING HOURS</h4>
+                    <div class="hours-grid">
+                        <span>MON – FRI</span> <span>5:00 – 23:00</span>
+                        <span>SATURDAYS</span> <span>8:00 – 16:00</span>
+                        <span>SUNDAYS</span> <span>8:00 – 13:00</span>
+                        <span>HOLIDAYS</span> <span>8:00 – 16:00</span>
+                    </div>
+                </div>
+                <div class="footer-col comments-col">
+                    <!-- Reviews moved to full-width section above footer -->
+                </div>
+                <div class="footer-col social-col">
+                    <h4>SOCIAL</h4>
+                    <ul>
+                        <li><a href="#">Instagram</a></li>
+                        <li><a href="#">Telegram</a></li>
+                        <li><a href="#">LinkedIn</a></li>
+                        <li><a href="#">Spotify</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <div id="auth-modal" class="modal-overlay">
+        <div class="modal-container">
+            <button class="close-btn" id="close-modal-btn"><i data-lucide="x"></i></button>
+            
+            <form id="login-form" class="modal-form-content">
+                {% csrf_token %}
+                <div class="modal-logo">MyFit.Place <i data-lucide="dumbbell"></i></div>
+                <h2>Login</h2>
+                <input type="email" id="login-email" name="login-email" placeholder="Enter e-mail address.......">
+                <input type="password" id="login-password" name="login-password" placeholder="Password.......">
+                <div class="form-options">
+                    <label><input type="checkbox"> Remember me</label>
+                    <a href="#" id="to-recovery">Forgot your password?</a>
+                </div>
+                <button type="submit" class="btn btn-submit" id="submit-login">Login</button>
+                <p class="switch-form">Don't have an account? <a href="#" id="to-signup">Sign Up</a></p>
+            </form>
+
+            <div id="signup-form" class="modal-form-content hidden-block">
+                <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+                <div class="modal-logo">MyFit.Place <i data-lucide="dumbbell"></i></div>
+                <h2>Sign Up</h2>
+                <input type="text" id="signup-nickname" name="signup-nickname" placeholder="Nickname.......">
+                <input type="email" id="signup-email" name="signup-email" placeholder="E-mail address.......">
+                <input type="password" id="signup-password" name="signup-password" placeholder="Create Password.......">
+                <input type="password" id="signup-password-confirm" name="signup-password-confirm" placeholder="Confirm Password.......">
+                <button type="button" class="btn btn-submit" id="submit-signup">Sign Up</button>
+                <p class="switch-form">Already have an account? <a href="#" id="to-login">Log In</a></p>
+            </div>
+
+            <div id="recovery-form" class="modal-form-content hidden-block">
+                <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+                <div class="modal-logo">MyFit.Place <i data-lucide="dumbbell"></i></div>
+                <h2>Recovery</h2>
+                <input type="email" name="recovery-email" placeholder="Enter your e-mail.......">
+                <button class="btn btn-submit">Send Code</button>
+                <p class="switch-form"><a href="#" id="back-to-login">Back to Login</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/auth.js' %}"></script>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

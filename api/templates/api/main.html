@@ -1,0 +1,83 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>MyFit.Place - Dashboard</title>
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+    <header class="cabinet-header">
+        <div class="logo-group">
+            <span>MyFit.Place</span>
+            <i data-lucide="dumbbell" class="icon-logo"></i>
+        </div>
+        <div class="user-info-header">
+            <span id="user-display-email">{{ user.nickname|default:user.email }}</span>
+            <span id="user-display-role" class="badge-role">{{ user.role }}</span>
+        </div>
+    </header>
+
+    <div class="cabinet-layout">
+        <aside class="sidebar">
+            <nav class="sidebar-menu top-menu">
+                {% if user.role == 'ADMIN' %}
+                    <a href="#" id="menu-coaches" class="menu-item"><i data-lucide="shield-check"></i> Управління тренерами</a>
+                    <a href="#" id="menu-clients" class="menu-item"><i data-lucide="users"></i> Управління клієнтами</a>
+                    <a href="#" id="menu-attendance" class="menu-item"><i data-lucide="activity"></i> Контроль відвідувань</a>
+                    <a href="#" class="menu-item"><i data-lucide="bar-chart-2"></i> Формування звіту</a>
+                    <a href="#" id="menu-review-comments" class="menu-item"><i data-lucide="star"></i> Перевірка коментарів</a>
+                    <a href="#" id="menu-communication" class="menu-item"><i data-lucide="message-square"></i> Комунікація</a>
+                    <a href="#" class="menu-item"><i data-lucide="key"></i> Відновлення паролю</a>
+                {% elif user.role == 'MANAGER' %}
+                    <a href="#" id="menu-coaches" class="menu-item"><i data-lucide="shield-check"></i> Управління тренерами</a>
+                    <a href="#" id="menu-clients" class="menu-item"><i data-lucide="users"></i> Управління клієнтами</a>
+                    <a href="#" id="menu-attendance" class="menu-item"><i data-lucide="activity"></i> Контроль відвідувань</a>
+                    <a href="#" id="menu-communication" class="menu-item"><i data-lucide="message-square"></i> Комунікація</a>
+                    <a href="#" class="menu-item"><i data-lucide="building"></i> Об'єкти</a>
+                    <a href="#" class="menu-item"><i data-lucide="dollar-sign"></i> Фінанси</a>
+                    <a href="#" class="menu-item"><i data-lucide="user-cog"></i> Адміністратори залу</a>
+                    <a href="#" class="menu-item"><i data-lucide="gavel"></i> Глобальна модерація</a>
+                    <a href="#" class="menu-item"><i data-lucide="settings"></i> Бізнес параметри</a>
+                {% elif user.role == 'COACH' %}
+                    <a href="#" class="menu-item"><i data-lucide="dumbbell"></i> Тренування</a>
+                    <a href="#" class="menu-item"><i data-lucide="users"></i> Подивитися клієнтів</a>
+                    <a href="#" class="menu-item"><i data-lucide="message-square"></i> Повідомлення</a>
+                    <a href="#" class="menu-item"><i data-lucide="life-buoy"></i> Звернення до підтримки</a>
+                {% elif user.role == 'CLIENT' %}
+                    <a href="#" class="menu-item"><i data-lucide="user"></i> Редагування профілю</a>
+                    <a href="#" class="menu-item"><i data-lucide="search"></i> Фільтр залів</a>
+                    <a href="#" class="menu-item"><i data-lucide="calendar-plus"></i> Запис на тренування</a>
+                    <a href="#" class="menu-item"><i data-lucide="trending-up"></i> Статистика прогресу</a>
+                    <a href="#" class="menu-item"><i data-lucide="message-square"></i> Повідомлення</a>
+                    <a href="#" class="menu-item"><i data-lucide="life-buoy"></i> Звернення до підтримки</a>
+                {% endif %}
+            </nav>
+
+            <nav class="sidebar-menu bottom-menu">
+                <hr class="menu-divider">
+                <a href="/" id="back-to-site-btn" class="menu-item"><i data-lucide="arrow-left"></i> Back to site</a>
+                <a href="#" class="menu-item"><i data-lucide="settings"></i> Settings</a>
+                <a href="#" class="menu-item"><i data-lucide="help-circle"></i> Help</a>
+                <a href="{% url 'logout' %}" id="logout-btn" class="menu-item logout-link"><i data-lucide="log-out"></i> Log Out</a>
+            </nav>
+        </aside>
+
+        <main class="content-area">
+            <div class="work-window">
+                <h2 id="workspace-title">Welcome to your dashboard</h2>
+                <div id="workspace-view" class="workspace-view">
+                    <p>Select an action from the sidebar menu to interact with system options.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{% static 'js/cabinet.js' %}"></script>
+    <script>lucide.createIcons();</script>
+</body>
+</html>
