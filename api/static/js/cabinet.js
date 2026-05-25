@@ -86,6 +86,11 @@ function initCabinet() {
                 return;
             }
 
+            if (this.id === 'menu-settings') {
+                loadSettings();
+                return;
+            }
+
             if (this.id === 'menu-review-comments') {
                 loadReviewComments();
                 return;
@@ -117,6 +122,7 @@ function initCabinet() {
         if (el.id === 'menu-coaches') return loadCoachManagement();
         if (el.id === 'menu-clients') return loadClientManagement();
         if (el.id === 'menu-attendance') return loadAttendanceControl();
+        if (el.id === 'menu-settings') return loadSettings();
         if (el.id === 'menu-review-comments') return loadReviewComments();
         if (el.id === 'menu-communication') return loadCommunication();
 
@@ -1253,39 +1259,52 @@ function loadSettings() {
         .then(data => {
             if (data.status !== 'success') throw new Error(data.message || 'Unable to load profile');
             const u = data.user;
-            document.getElementById('profile-nickname').value = u.nickname || '';
-            document.getElementById('profile-phone').value = u.phone || '';
-            document.getElementById('profile-description').value = u.description || '';
+            const nickEl = document.getElementById('profile-nickname');
+            const phoneEl = document.getElementById('profile-phone');
+            const descEl = document.getElementById('profile-description');
             const preview = document.getElementById('avatar-preview');
-            if (u.avatar) preview.innerHTML = `<img src="${u.avatar}" style="width:100%;height:100%;object-fit:cover">`;
-            else preview.innerHTML = '';
+
+            if (nickEl) nickEl.value = u.nickname || '';
+            if (phoneEl) phoneEl.value = u.phone || '';
+            if (descEl) descEl.value = u.description || '';
+            if (preview) {
+                if (u.avatar) preview.innerHTML = `<img src="${u.avatar}" style="width:100%;height:100%;object-fit:cover">`;
+                else preview.innerHTML = '';
+            }
 
             // photo input preview
             const photoInput = document.getElementById('profile-photo-input');
-            photoInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const url = URL.createObjectURL(file);
-                preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
-            });
+            if (photoInput && preview) {
+                photoInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const url = URL.createObjectURL(file);
+                    preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
+                });
+            }
 
-            document.getElementById('profile-save-btn').addEventListener('click', (ev) => {
-                ev.preventDefault();
-                const fd = new FormData();
-                fd.append('nickname', document.getElementById('profile-nickname').value);
-                fd.append('phone', document.getElementById('profile-phone').value);
-                fd.append('description', document.getElementById('profile-description').value);
-                fd.append('new_password', document.getElementById('profile-new-password').value || '');
-                fd.append('new_password_confirm', document.getElementById('profile-new-password-confirm').value || '');
-                const file = document.getElementById('profile-photo-input').files[0];
-                if (file) fd.append('photo', file);
+            const saveBtn = document.getElementById('profile-save-btn');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', (ev) => {
+                    ev.preventDefault();
+                    const fd = new FormData();
+                    if (nickEl) fd.append('nickname', nickEl.value);
+                    if (phoneEl) fd.append('phone', phoneEl.value);
+                    if (descEl) fd.append('description', descEl.value);
+                    const newPassEl = document.getElementById('profile-new-password');
+                    const newPassConfirmEl = document.getElementById('profile-new-password-confirm');
+                    fd.append('new_password', newPassEl ? newPassEl.value || '' : '');
+                    fd.append('new_password_confirm', newPassConfirmEl ? newPassConfirmEl.value || '' : '');
+                    const file = photoInput && photoInput.files ? photoInput.files[0] : null;
+                    if (file) fd.append('photo', file);
 
-                fetchJson('/profile-api/', { method: 'POST', body: fd, headers: {'X-CSRFToken': getCsrfToken()} })
-                    .then(res => {
-                        alert(window.t ? window.t('alert.profile_updated') : 'Profile updated');
-                    })
-                    .catch(err => alert(err.message || 'Error'));
-            });
+                    fetchJson('/profile-api/', { method: 'POST', body: fd, headers: {'X-CSRFToken': getCsrfToken()} })
+                        .then(res => {
+                            alert(window.t ? window.t('alert.profile_updated') : 'Profile updated');
+                        })
+                        .catch(err => alert(err.message || 'Error'));
+                });
+            }
         })
         .catch(err => {
             const view = document.getElementById('workspace-view');
