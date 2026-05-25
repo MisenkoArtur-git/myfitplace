@@ -1,7 +1,7 @@
-const COACH_TITLE = 'Управління тренерами';
-const CLIENT_TITLE = 'Управління клієнтами';
-const ATTENDANCE_TITLE = 'Контроль відвідувань';
-const COMMUNICATION_TITLE = 'Комунікація';
+const COACH_TITLE = 'menu.coaches';
+const CLIENT_TITLE = 'menu.clients';
+const ATTENDANCE_TITLE = 'menu.attendance';
+const COMMUNICATION_TITLE = 'menu.communication';
 let coachCache = [];
 let clientCache = [];
 let attendanceCache = [];
@@ -10,7 +10,35 @@ let communicationMessages = [];
 let activeCommunicationUserId = null;
 let hallCache = [];
 
-document.addEventListener('DOMContentLoaded', () => {
+// debug: confirm script loaded
+try { console.log('cabinet.js: loaded'); } catch (e) {}
+
+// Robust fetch helper: returns parsed JSON or throws with clear message.
+async function fetchJson(url, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+    }, opts.headers || {});
+    if (!opts.credentials) opts.credentials = 'same-origin';
+
+    const resp = await fetch(url, opts);
+    const text = await resp.text();
+    let data = null;
+    try {
+        data = text ? JSON.parse(text) : null;
+    } catch (e) {
+        const msg = text || 'Server returned non-JSON response';
+        throw new Error(msg);
+    }
+    if (!resp.ok) {
+        const msg = (data && data.message) ? data.message : resp.statusText || 'Request failed';
+        throw new Error(msg);
+    }
+    return data;
+}
+
+function initCabinet() {
     const logoutBtn = document.getElementById('logout-btn');
     const backToSiteBtn = document.getElementById('back-to-site-btn');
     if (logoutBtn) {
@@ -74,7 +102,31 @@ document.addEventListener('DOMContentLoaded', () => {
                                         <div class="content-box">Тут буде динамічний контент для ${title}.</div>`);
         });
     });
-});
+
+    // Also attach delegated handler in case menu nodes are replaced by other scripts
+    document.body.addEventListener('click', function(e) {
+        const el = e.target.closest('.sidebar .menu-item');
+        if (!el) return;
+        if (el.id === 'logout-btn') return;
+        if (el.id === 'back-to-site-btn') {
+            window.location.href = '/';
+            return;
+        }
+        e.preventDefault();
+        setActiveClass(el);
+        if (el.id === 'menu-coaches') return loadCoachManagement();
+        if (el.id === 'menu-clients') return loadClientManagement();
+        if (el.id === 'menu-attendance') return loadAttendanceControl();
+        if (el.id === 'menu-review-comments') return loadReviewComments();
+        if (el.id === 'menu-communication') return loadCommunication();
+
+        const title = el.innerText.trim();
+        updateWorkspace(title, '', `<p>Ви обрали розділ: <strong>${title}</strong></p>
+                                    <div class="content-box">Тут буде динамічний контент для ${title}.</div>`);
+    });
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initCabinet); else initCabinet();
 
 function getCsrfToken() {
     const meta = document.querySelector('meta[name="csrf-token"]');
@@ -86,46 +138,78 @@ function loadCoachManagement() {
         <div class="coach-panel">
             <div class="coach-panel-header">
                 <div class="coach-search-box">
-                    <input id="coach-search-input" type="search" placeholder="Search for coach...">
+                    <input id="coach-search-input" type="search" data-i18n="coach.search.placeholder" placeholder="">
                 </div>
-                <button id="add-coach-btn" class="coach-action-btn">Add coach</button>
+                <button id="add-coach-btn" class="coach-action-btn" data-i18n="coach.add">Add coach</button>
             </div>
             <div id="coach-list" class="coach-cards-grid"></div>
         </div>
         <div id="coach-modal" class="modal-overlay hidden"></div>
     `;
 
-    updateWorkspace(COACH_TITLE, '', html);
-    const searchInput = document.getElementById('coach-search-input');
-    const addCoachBtn = document.getElementById('add-coach-btn');
+    updateWorkspace('', '', html);
+    const wt = document.getElementById('workspace-title');
+    if (wt) wt.setAttribute('data-i18n', COACH_TITLE);
+    if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
+    // Defer attaching handlers and fetching list until DOM updates and translations settle
+    requestAnimationFrame(() => {
+        const searchInput = document.getElementById('coach-search-input');
+        const addCoachBtn = document.getElementById('add-coach-btn');
 
-    searchInput?.addEventListener('input', () => {
-        renderCoachCards(filterCoaches(searchInput.value));
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                renderCoachCards(filterCoaches(searchInput.value));
+            });
+        }
+
+        if (addCoachBtn) {
+            addCoachBtn.addEventListener('click', () => {
+                openCoachModal('create');
+            });
+        }
+
+        refreshCoachList();
     });
-
-    addCoachBtn?.addEventListener('click', () => {
-        openCoachModal('create');
-    });
-
-    refreshCoachList();
 }
 
 function refreshCoachList() {
-    fetch('/coach-api/')
-        .then(response => response.json())
-        .then(data => {
-            if (data.status !== 'success') throw new Error(data.message || 'Unable to load coaches');
-            coachCache = data.coaches || [];
-            renderCoachCards(coachCache);
-        })
-        .catch(error => {
-            document.getElementById('coach-list').innerHTML = `<p class="content-box">${error.message}</p>`;
-        });
+    console.log('refreshCoachList: requesting /coach-api/');
+
+    function doFetchAndRender(attemptsLeft = 10) {
+        const listEl = document.getElementById('coach-list');
+        if (!listEl) {
+            console.warn('refreshCoachList: coach-list element not found, attempts left', attemptsLeft);
+            if (attemptsLeft > 0) {
+                setTimeout(() => doFetchAndRender(attemptsLeft - 1), 80);
+                return;
+            }
+            // final fallback: render to workspace
+        }
+
+        fetchJson('/coach-api/')
+            .then(data => {
+                console.log('refreshCoachList: response', data);
+                if (data.status !== 'success') throw new Error(data.message || 'Unable to load coaches');
+                coachCache = data.coaches || [];
+                // only render if container exists, otherwise put into workspace view
+                if (listEl) renderCoachCards(coachCache);
+                else {
+                    const view = document.getElementById('workspace-view');
+                    if (view) view.innerHTML = `<div class="content-box">No coach container found to render list.</div>`;
+                }
+            })
+            .catch(error => {
+                console.error('refreshCoachList error', error);
+                const view = document.getElementById('workspace-view');
+                if (view) view.innerHTML = `<div class="content-box">${error.message}</div>`;
+            });
+    }
+
+    doFetchAndRender();
 }
 
 function refreshClientList() {
-    fetch('/client-api/')
-        .then(response => response.json())
+    fetchJson('/client-api/')
         .then(data => {
             if (data.status !== 'success') throw new Error(data.message || 'Unable to load clients');
             clientCache = data.clients || [];
@@ -137,10 +221,8 @@ function refreshClientList() {
 }
 
 function loadHalls() {
-    return fetch('/halls-api/')
-        .then(response => response.json())
+    return fetchJson('/halls-api/')
         .then(data => {
-            if (data.status !== 'success') throw new Error(data.message || 'Unable to load halls');
             hallCache = data.halls || [];
         })
         .catch(() => {
@@ -172,14 +254,8 @@ function filterCoaches(query) {
 
 function renderCoachCards(coaches) {
     const container = document.getElementById('coach-list');
-    if (!container) return;
-
-    if (!coaches.length) {
-        container.innerHTML = '<div class="content-box">No coaches found. Click "Add coach" to create the first one.</div>';
-        return;
-    }
-
-    container.innerHTML = coaches.map(coach => {
+    const workspaceView = document.getElementById('workspace-view');
+    const coachCardsHtml = coaches.map(coach => {
         const photoUrl = coach.photo_url || 'https://via.placeholder.com/400x240?text=No+photo';
         const shortDesc = coach.description ? coach.description.slice(0, 120) : 'No description yet.';
 
@@ -188,37 +264,82 @@ function renderCoachCards(coaches) {
                 <img src="${photoUrl}" alt="Coach photo">
                 <div class="coach-card-header">
                     <div>
-                        <h3>${coach.nickname || 'Unnamed Coach'}</h3>
-                        <p>${coach.spec || 'Qualification not set'}</p>
+                        <h3>${coach.nickname || (window.t ? window.t('coach.unnamed') : 'Unnamed Coach')}</h3>
+                        <p>${coach.spec || (window.t ? window.t('coach.no_spec') : 'Qualification not set')}</p>
                     </div>
-                    <span class="coach-badge">COACH</span>
+                    <span class="coach-badge" data-i18n="coach.badge">COACH</span>
                 </div>
                 <p>${shortDesc}</p>
                 <p><strong>Email:</strong> ${coach.email}</p>
                 <p><strong>Phone:</strong> ${coach.phone || '—'}</p>
                 <p><strong>Hall:</strong> ${coach.hall_name || 'Not assigned'}</p>
                 <div class="coach-card-footer">
-                    <button class="edit-btn" data-coach-id="${coach.id}">Edit</button>
-                    <button class="delete-btn" data-coach-id="${coach.id}">Delete</button>
+                    <button class="edit-btn" data-coach-id="${coach.id}" data-i18n="coach.edit">Edit</button>
+                    <button class="delete-btn" data-coach-id="${coach.id}" data-i18n="coach.delete">Delete</button>
                 </div>
             </div>
         `;
     }).join('');
 
-    container.querySelectorAll('.edit-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const coachId = btn.getAttribute('data-coach-id');
-            const coach = coachCache.find(item => String(item.id) === coachId);
-            if (coach) openCoachModal('edit', coach);
-        });
-    });
+    if (!coaches.length) {
+        const noHtml = '<div class="content-box" data-i18n="coach.no_coaches">No coaches found. Click "Add coach" to create the first one.</div>';
+        if (container) { container.innerHTML = noHtml; if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en'); return; }
+        if (workspaceView) { workspaceView.innerHTML = `<div class="coach-panel">${noHtml}</div>`; if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en'); return; }
+    }
 
-    container.querySelectorAll('.delete-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const coachId = btn.getAttribute('data-coach-id');
-            if (confirm('Delete this coach?')) deleteCoach(coachId);
+    if (container) {
+        container.innerHTML = coachCardsHtml;
+        if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
+
+        container.querySelectorAll('.edit-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const coachId = btn.getAttribute('data-coach-id');
+                const coach = coachCache.find(item => String(item.id) === coachId);
+                if (coach) openCoachModal('edit', coach);
+            });
         });
-    });
+
+        container.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const coachId = btn.getAttribute('data-coach-id');
+                if (confirm(window.t ? window.t('confirm.delete_coach') : 'Delete this coach?')) deleteCoach(coachId);
+            });
+        });
+        return;
+    }
+
+    // fallback: render a minimal coach panel into workspaceView
+    if (workspaceView) {
+        const header = `
+            <div class="coach-panel">
+                <div class="coach-panel-header">
+                    <div class="coach-search-box"><input id="coach-search-input" type="search" placeholder="Search for coach..."></div>
+                    <button id="add-coach-btn" class="coach-action-btn">Add coach</button>
+                </div>
+                <div class="coach-cards-grid">${coachCardsHtml}</div>
+            </div>`;
+        workspaceView.innerHTML = header;
+        if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
+
+        const searchInput = document.getElementById('coach-search-input');
+        const addCoachBtn = document.getElementById('add-coach-btn');
+        if (searchInput) searchInput.addEventListener('input', () => renderCoachCards(filterCoaches(searchInput.value)));
+        if (addCoachBtn) addCoachBtn.addEventListener('click', () => openCoachModal('create'));
+
+        workspaceView.querySelectorAll('.edit-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const coachId = btn.getAttribute('data-coach-id');
+                const coach = coachCache.find(item => String(item.id) === coachId);
+                if (coach) openCoachModal('edit', coach);
+            });
+        });
+        workspaceView.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const coachId = btn.getAttribute('data-coach-id');
+                if (confirm(window.t ? window.t('confirm.delete_coach') : 'Delete this coach?')) deleteCoach(coachId);
+            });
+        });
+    }
 }
 
 function openCoachModal(mode, coach = {}) {
@@ -234,33 +355,33 @@ function openCoachModal(mode, coach = {}) {
     modal.innerHTML = `
         <div class="modal-content">
             <div class="modal-header">
-                <h3>${canEdit ? 'Edit coach' : 'Add a coach'}</h3>
+                <h3 data-i18n="${canEdit ? 'coach.edit_modal' : 'coach.add_modal'}"></h3>
                 <button class="modal-close" id="coach-modal-close" type="button">×</button>
             </div>
             <form id="coach-form" class="coach-form-grid">
                 <div class="form-column">
                     <label class="photo-upload-label" for="coach-photo-input">
-                        <span>Upload photo</span>
+                        <span data-i18n="upload.photo">Upload photo</span>
                         <input id="coach-photo-input" name="photo" type="file" accept="image/*">
                     </label>
                     <img id="coach-photo-preview" class="photo-preview" src="${coach.photo_url || 'https://via.placeholder.com/400x240?text=Photo'}" alt="Photo preview">
-                    <input id="coach-last-name" name="last_name" type="text" placeholder="Last name" value="${lastName}">
-                    <input id="coach-first-name" name="first_name" type="text" placeholder="First name" value="${firstName}">
-                    <input id="coach-middle-name" name="middle_name" type="text" placeholder="Middle name" value="${middleName}">
+                    <input id="coach-last-name" name="last_name" type="text" data-i18n="placeholder.last_name" placeholder="" value="${lastName}">
+                    <input id="coach-first-name" name="first_name" type="text" data-i18n="placeholder.first_name" placeholder="" value="${firstName}">
+                    <input id="coach-middle-name" name="middle_name" type="text" data-i18n="placeholder.middle_name" placeholder="" value="${middleName}">
                 </div>
                 <div class="form-column">
-                    <input id="coach-spec" name="spec" type="text" placeholder="Qualification / specification" value="${coach.spec || ''}">
-                    <textarea id="coach-description" name="description" placeholder="Description about yourself">${coach.description || ''}</textarea>
+                    <input id="coach-spec" name="spec" type="text" data-i18n="placeholder.spec" placeholder="" value="${coach.spec || ''}">
+                    <textarea id="coach-description" name="description" data-i18n="placeholder.description" placeholder="">${coach.description || ''}</textarea>
                     <select id="coach-hall" name="hall"></select>
-                    <input id="coach-email" name="email" type="email" placeholder="Email" value="${coach.email || ''}" ${canEdit ? '' : 'required'}>
-                    <input id="coach-phone" name="phone" type="text" placeholder="Phone number" value="${coach.phone || ''}">
-                    <input id="coach-password" name="password" type="password" placeholder="Password ${canEdit ? '(leave blank to keep)' : ''}" ${canEdit ? '' : 'required'}>
+                    <input id="coach-email" name="email" type="email" data-i18n="placeholder.email" placeholder="" value="${coach.email || ''}" ${canEdit ? '' : 'required'}>
+                    <input id="coach-phone" name="phone" type="text" data-i18n="placeholder.phone" placeholder="" value="${coach.phone || ''}">
+                    <input id="coach-password" name="password" type="password" data-i18n="placeholder.password" placeholder="" ${canEdit ? '' : 'required'}>
                     <input type="hidden" id="coach-id" name="coach_id" value="${coach.id || ''}">
                 </div>
             </form>
             <div class="modal-actions">
-                <button class="save-btn" id="coach-save-btn" type="button">Save</button>
-                <button class="cancel-btn" id="coach-cancel-btn" type="button">Close</button>
+                <button class="save-btn" id="coach-save-btn" type="button" data-i18n="button.save">Save</button>
+                <button class="cancel-btn" id="coach-cancel-btn" type="button" data-i18n="button.close">Close</button>
             </div>
         </div>
     `;
@@ -272,6 +393,7 @@ function openCoachModal(mode, coach = {}) {
     document.getElementById('coach-photo-input').addEventListener('change', updatePhotoPreview);
     document.getElementById('coach-save-btn').addEventListener('click', () => saveCoach(mode));
     loadHalls().then(() => renderHallOptions('coach-hall', coach.hall_id));
+    if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
     modal.addEventListener('click', event => {
         if (event.target === modal) closeCoachModal();
     });
@@ -317,12 +439,12 @@ function saveCoach(mode) {
     const photoInput = document.getElementById('coach-photo-input');
 
     if (!email) {
-        alert('Email is required');
+        alert(window.t ? window.t('alert.email_required') : 'Email is required');
         return;
     }
 
     if (mode === 'create' && !password) {
-        alert('Password is required for new coach');
+        alert(window.t ? window.t('alert.password_required_coach') : 'Password is required for new coach');
         return;
     }
 
@@ -340,14 +462,8 @@ function saveCoach(mode) {
         formData.append('photo', photoInput.files[0]);
     }
 
-    fetch('/coach-save-api/', {
-        method: 'POST',
-        headers: { 'X-CSRFToken': getCsrfToken() },
-        body: formData
-    })
-    .then(response => response.json())
+    fetchJson('/coach-save-api/', { method: 'POST', headers: { 'X-CSRFToken': getCsrfToken() }, body: formData })
     .then(data => {
-        if (data.status !== 'success') throw new Error(data.message || 'Unable to save coach');
         closeCoachModal();
         refreshCoachList();
     })
@@ -355,17 +471,8 @@ function saveCoach(mode) {
 }
 
 function deleteCoach(coachId) {
-    fetch('/coach-save-api/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCsrfToken()
-        },
-        body: JSON.stringify({ action: 'delete', id: coachId })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status !== 'success') throw new Error(data.message || 'Unable to delete coach');
+    fetchJson('/coach-save-api/', { method: 'POST', headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()}, body: JSON.stringify({ action: 'delete', id: coachId }) })
+    .then(() => {
         refreshCoachList();
     })
     .catch(error => alert(error.message));
@@ -385,7 +492,10 @@ function loadClientManagement() {
         <div id="client-modal" class="modal-overlay hidden"></div>
     `;
 
-    updateWorkspace(CLIENT_TITLE, '', html);
+    updateWorkspace('', '', html);
+    const wt = document.getElementById('workspace-title');
+    if (wt) wt.setAttribute('data-i18n', CLIENT_TITLE);
+    if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
     const searchInput = document.getElementById('client-search-input');
     const addClientBtn = document.getElementById('add-client-btn');
 
@@ -415,7 +525,8 @@ function renderClientCards(clients) {
     if (!container) return;
 
     if (!clients.length) {
-        container.innerHTML = '<div class="content-box">No clients found. Click "Add client" to create the first one.</div>';
+        container.innerHTML = '<div class="content-box" data-i18n="coach.no_coaches">No clients found. Click "Add client" to create the first one.</div>';
+        if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
         return;
     }
 
@@ -428,21 +539,22 @@ function renderClientCards(clients) {
                 <img src="${photoUrl}" alt="Client photo">
                 <div class="coach-card-header">
                     <div>
-                        <h3>${client.nickname || 'Unnamed Client'}</h3>
-                        <p>${client.phone ? 'Phone: ' + client.phone : 'No phone provided'}</p>
+                        <h3>${client.nickname || (window.t ? window.t('client.unnamed') : 'Unnamed Client')}</h3>
+                        <p>${client.phone ? (window.t ? window.t('label.phone') : 'Phone:') + ' ' + client.phone : (window.t ? window.t('client.no_phone') : 'No phone provided')}</p>
                     </div>
-                    <span class="coach-badge">CLIENT</span>
+                    <span class="coach-badge" data-i18n="client.badge">CLIENT</span>
                 </div>
                 <p>${shortDesc}</p>
                 <p><strong>Email:</strong> ${client.email}</p>
                 <p><strong>Hall:</strong> ${client.hall_name || 'Not assigned'}</p>
                 <div class="coach-card-footer">
-                    <button class="edit-btn" data-client-id="${client.id}">Edit</button>
-                    <button class="delete-btn" data-client-id="${client.id}">Delete</button>
+                    <button class="edit-btn" data-client-id="${client.id}" data-i18n="client.edit">Edit</button>
+                    <button class="delete-btn" data-client-id="${client.id}" data-i18n="client.delete">Delete</button>
                 </div>
             </div>
         `;
     }).join('');
+    if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
 
     container.querySelectorAll('.edit-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -455,7 +567,7 @@ function renderClientCards(clients) {
     container.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const clientId = btn.getAttribute('data-client-id');
-            if (confirm('Delete this client?')) deleteClient(clientId);
+            if (confirm(window.t ? window.t('confirm.delete_client') : 'Delete this client?')) deleteClient(clientId);
         });
     });
 }
@@ -532,12 +644,12 @@ function saveClient(mode) {
     const photoInput = document.getElementById('client-photo-input');
 
     if (!email) {
-        alert('Email is required');
+        alert(window.t ? window.t('alert.email_required') : 'Email is required');
         return;
     }
 
     if (mode === 'create' && !password) {
-        alert('Password is required for new client');
+        alert(window.t ? window.t('alert.password_required_client') : 'Password is required for new client');
         return;
     }
 
@@ -554,14 +666,8 @@ function saveClient(mode) {
         formData.append('photo', photoInput.files[0]);
     }
 
-    fetch('/client-save-api/', {
-        method: 'POST',
-        headers: { 'X-CSRFToken': getCsrfToken() },
-        body: formData
-    })
-    .then(response => response.json())
+    fetchJson('/client-save-api/', { method: 'POST', headers: { 'X-CSRFToken': getCsrfToken() }, body: formData })
     .then(data => {
-        if (data.status !== 'success') throw new Error(data.message || 'Unable to save client');
         closeClientModal();
         refreshClientList();
     })
@@ -569,17 +675,8 @@ function saveClient(mode) {
 }
 
 function deleteClient(clientId) {
-    fetch('/client-save-api/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCsrfToken()
-        },
-        body: JSON.stringify({ action: 'delete', id: clientId })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status !== 'success') throw new Error(data.message || 'Unable to delete client');
+    fetchJson('/client-save-api/', { method: 'POST', headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()}, body: JSON.stringify({ action: 'delete', id: clientId }) })
+    .then(() => {
         refreshClientList();
     })
     .catch(error => alert(error.message));
@@ -589,57 +686,60 @@ function loadAttendanceControl() {
     const html = `
         <div class="attendance-panel">
             <div class="attendance-add-section">
-                <h3>Mark Trainer Attendance</h3>
+                <h3 data-i18n="attendance.mark_trainer">Mark Trainer Attendance</h3>
                 <div class="attendance-add-form">
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="attendance-add-trainer">Trainer</label>
+                            <label for="attendance-add-trainer" data-i18n="attendance.trainer_label">Trainer</label>
                             <select id="attendance-add-trainer"></select>
                         </div>
                         <div class="form-group">
-                            <label for="attendance-add-date">Date & Time</label>
+                            <label for="attendance-add-date" data-i18n="attendance.date_label">Date & Time</label>
                             <input id="attendance-add-date" type="datetime-local">
                         </div>
                         <div class="form-group">
-                            <label for="attendance-add-status">Status</label>
+                            <label for="attendance-add-status" data-i18n="attendance.status_label">Status</label>
                             <select id="attendance-add-status">
-                                <option value="UNKNOWN">Unknown</option>
-                                <option value="SHOWED">Showed</option>
-                                <option value="NO_SHOW">No-show</option>
+                                <option value="UNKNOWN" data-i18n="attendance.status.UNKNOWN">Unknown</option>
+                                <option value="SHOWED" data-i18n="attendance.status.SHOWED">Showed</option>
+                                <option value="NO_SHOW" data-i18n="attendance.status.NO_SHOW">No-show</option>
                             </select>
                         </div>
-                        <button id="attendance-add-btn" class="coach-action-btn">Mark Attendance</button>
+                        <button id="attendance-add-btn" class="coach-action-btn" data-i18n="attendance.mark_btn">Mark Attendance</button>
                     </div>
                 </div>
             </div>
 
             <div class="attendance-filters">
                 <div class="filter-group">
-                    <label for="attendance-hall">Hall</label>
+                    <label for="attendance-hall" data-i18n="label.hall">Hall</label>
                     <select id="attendance-hall"></select>
                 </div>
                 <div class="filter-group">
-                    <label for="attendance-start">Start date</label>
+                    <label for="attendance-start" data-i18n="label.date">Start date</label>
                     <input id="attendance-start" type="date">
                 </div>
                 <div class="filter-group">
-                    <label for="attendance-end">End date</label>
+                    <label for="attendance-end" data-i18n="label.date">End date</label>
                     <input id="attendance-end" type="date">
                 </div>
                 <div class="filter-group">
-                    <label for="attendance-search">Trainer search</label>
-                    <input id="attendance-search" type="search" placeholder="Search trainer...">
+                    <label for="attendance-search" data-i18n="attendance.trainer_label">Trainer search</label>
+                    <input id="attendance-search" type="search" data-i18n="attendance.search_placeholder" placeholder="">
                 </div>
                 <div class="filter-actions">
-                    <button id="attendance-generate-btn" class="coach-action-btn">Generate</button>
-                    <button id="attendance-save-btn" class="coach-action-btn secondary attendance-save-btn">Save attendance</button>
+                    <button id="attendance-generate-btn" class="coach-action-btn" data-i18n="attendance.generate">Generate</button>
+                    <button id="attendance-save-btn" class="coach-action-btn secondary attendance-save-btn" data-i18n="attendance.save">Save attendance</button>
                 </div>
             </div>
             <div id="attendance-results" class="attendance-results"></div>
         </div>
     `;
 
-    updateWorkspace(ATTENDANCE_TITLE, '', html);
+    updateWorkspace('', '', html);
+    const wt = document.getElementById('workspace-title');
+    if (wt) wt.setAttribute('data-i18n', ATTENDANCE_TITLE);
+    if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
 
     loadHalls().then(() => renderHallOptions('attendance-hall'));
     
@@ -648,22 +748,29 @@ function loadAttendanceControl() {
     });
 
     const today = new Date().toISOString().slice(0, 10);
-    document.getElementById('attendance-start').value = today;
-    document.getElementById('attendance-end').value = today;
+    // ensure DOM inserted before accessing elements
+    requestAnimationFrame(() => {
+        const startEl = document.getElementById('attendance-start');
+        const endEl = document.getElementById('attendance-end');
+        if (startEl) startEl.value = today;
+        if (endEl) endEl.value = today;
 
-    document.getElementById('attendance-generate-btn')?.addEventListener('click', generateAttendanceReport);
-    document.getElementById('attendance-save-btn')?.addEventListener('click', saveAttendanceReport);
-    document.getElementById('attendance-add-btn')?.addEventListener('click', addAttendanceRecord);
-    document.getElementById('attendance-search')?.addEventListener('input', () => filterAttendance(document.getElementById('attendance-search').value));
+        const genBtn = document.getElementById('attendance-generate-btn');
+        const saveBtn = document.getElementById('attendance-save-btn');
+        const addBtn = document.getElementById('attendance-add-btn');
+        const searchEl = document.getElementById('attendance-search');
+
+        if (genBtn) genBtn.addEventListener('click', generateAttendanceReport);
+        if (saveBtn) saveBtn.addEventListener('click', saveAttendanceReport);
+        if (addBtn) addBtn.addEventListener('click', addAttendanceRecord);
+        if (searchEl) searchEl.addEventListener('input', () => filterAttendance(searchEl.value));
+    });
 }
 
 function loadCoachesForAttendance() {
-    return fetch('/coach-api/')
-        .then(response => response.json())
+    return fetchJson('/coach-api/')
         .then(data => {
-            if (data.status === 'success') {
-                coachCache = data.coaches || [];
-            }
+            coachCache = data.coaches || [];
         })
         .catch(() => {
             coachCache = [];
@@ -688,29 +795,15 @@ function addAttendanceRecord() {
     const status = document.getElementById('attendance-add-status')?.value || 'UNKNOWN';
 
     if (!trainerId || !trainingDateStr) {
-        alert('Please select trainer and date & time');
+        alert(window.t ? window.t('alert.select_trainer_date') : 'Please select trainer and date & time');
         return;
     }
 
     const trainingDate = new Date(trainingDateStr).toISOString();
 
-    fetch('/attendance-save-api/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCsrfToken()
-        },
-        body: JSON.stringify({
-            action: 'create',
-            trainer_id: trainerId,
-            training_date: trainingDate,
-            status: status
-        })
-    })
-    .then(response => response.json())
+    fetchJson('/attendance-save-api/', { method: 'POST', headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()}, body: JSON.stringify({ action:'create', trainer_id:trainerId, training_date:trainingDate, status }) })
     .then(data => {
-        if (data.status !== 'success') throw new Error(data.message || 'Unable to add record');
-        alert('Attendance marked successfully');
+        alert(window.t ? window.t('alert.attendance_marked') : 'Attendance marked successfully');
         document.getElementById('attendance-add-trainer').value = '';
         document.getElementById('attendance-add-date').value = '';
         document.getElementById('attendance-add-status').value = 'UNKNOWN';
@@ -724,14 +817,12 @@ function generateAttendanceReport() {
     const endDate = document.getElementById('attendance-end')?.value;
 
     if (!startDate || !endDate) {
-        alert('Please choose start and end dates');
+        alert(window.t ? window.t('alert.choose_dates') : 'Please choose start and end dates');
         return;
     }
 
-    fetch(`/attendance-api/?hall=${hallId || ''}&start_date=${startDate}&end_date=${endDate}`)
-        .then(response => response.json())
+    fetchJson(`/attendance-api/?hall=${hallId || ''}&start_date=${startDate}&end_date=${endDate}`)
         .then(data => {
-            if (data.status !== 'success') throw new Error(data.message || 'Unable to load attendance data');
             attendanceCache = data.attendance || [];
             renderAttendanceList(attendanceCache);
         })
@@ -803,23 +894,13 @@ function saveAttendanceReport() {
     }));
 
     if (!items.length) {
-        alert('No attendance data to save');
+        alert(window.t ? window.t('alert.no_attendance_data') : 'No attendance data to save');
         return;
     }
 
-    fetch('/attendance-save-api/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCsrfToken()
-        },
-        body: JSON.stringify({ items })
-    })
-    .then(response => response.json())
+    fetchJson('/attendance-save-api/', { method: 'POST', headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()}, body: JSON.stringify({ items }) })
     .then(data => {
-        if (data.status !== 'success') throw new Error(data.message || 'Unable to save attendance');
-        alert('Attendance saved successfully');
-        generateAttendanceReport();
+        alert(window.t ? window.t('alert.attendance_saved') : 'Attendance saved');
     })
     .catch(error => alert(error.message));
 }
@@ -829,25 +910,28 @@ function loadCommunication() {
         <div class="communication-panel">
             <div class="contacts-panel">
                 <div class="contacts-panel-header">
-                    <h3>Чати</h3>
-                    <input id="communication-search" type="search" placeholder="Пошук тренера або клієнта...">
+                    <h3 data-i18n="communication.chats_label">Chats</h3>
+                    <input id="communication-search" type="search" data-i18n="communication.search_placeholder" placeholder="">
                 </div>
                 <div id="communication-contacts" class="contacts-list"></div>
             </div>
             <div class="chat-panel">
                 <div class="chat-panel-header">
-                    <h3 id="chat-heading">Оберіть чат для початку</h3>
+                    <h3 id="chat-heading" data-i18n="communication.select_chat_label">Select a chat to start</h3>
                 </div>
                 <div id="communication-messages" class="chat-messages"></div>
                 <div class="chat-input-row">
-                    <textarea id="communication-message-input" placeholder="Написати повідомлення..."></textarea>
-                    <button id="communication-send-btn" class="coach-action-btn">Send</button>
+                    <textarea id="communication-message-input" data-i18n="communication.write_message_placeholder" placeholder=""></textarea>
+                    <button id="communication-send-btn" class="coach-action-btn" data-i18n="communication.send">Send</button>
                 </div>
             </div>
         </div>
     `;
 
-    updateWorkspace(COMMUNICATION_TITLE, '', html);
+    updateWorkspace('', '', html);
+    const wt = document.getElementById('workspace-title');
+    if (wt) wt.setAttribute('data-i18n', COMMUNICATION_TITLE);
+    if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
     document.getElementById('communication-search')?.addEventListener('input', () => {
         renderCommunicationContacts(filterCommunicationContacts(document.getElementById('communication-search').value));
     });
@@ -856,10 +940,8 @@ function loadCommunication() {
 }
 
 function refreshCommunicationContacts() {
-    fetch('/communication-users-api/')
-        .then(response => response.json())
+    fetchJson('/communication-users-api/')
         .then(data => {
-            if (data.status !== 'success') throw new Error(data.message || 'Unable to load contacts');
             communicationContacts = data.contacts || [];
             renderCommunicationContacts(communicationContacts);
         })
@@ -920,10 +1002,8 @@ function openCommunicationChat(contactId) {
         heading.innerText = `Чат з ${contact.nickname}`;
     }
     document.getElementById('communication-message-input').value = '';
-    fetch(`/communication-messages-api/?other_id=${contactId}`)
-        .then(response => response.json())
+    fetchJson(`/communication-messages-api/?other_id=${contactId}`)
         .then(data => {
-            if (data.status !== 'success') throw new Error(data.message || 'Unable to load chat messages');
             communicationMessages = data.messages || [];
             renderCommunicationMessages();
             renderCommunicationContacts(filterCommunicationContacts(document.getElementById('communication-search').value));
@@ -938,7 +1018,7 @@ function renderCommunicationMessages() {
     if (!container) return;
 
     if (!activeCommunicationUserId) {
-        container.innerHTML = '<div class="content-box">Оберіть чат для перегляду повідомлень.</div>';
+        container.innerHTML = '<div class="content-box" data-i18n="communication.choose_chat">Choose a chat to view messages.</div>';
         return;
     }
 
@@ -965,25 +1045,16 @@ function sendCommunicationMessage() {
     const text = input?.value.trim();
 
     if (!receiverId) {
-        alert('Оберіть чат, до якого надсилати повідомлення.');
+        alert(window.t ? window.t('alert.select_chat') : 'Please select a chat to send a message.');
         return;
     }
     if (!text) {
-        alert('Введіть текст повідомлення.');
+        alert(window.t ? window.t('alert.enter_message') : 'Please enter message text.');
         return;
     }
 
-    fetch('/communication-send-api/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCsrfToken()
-        },
-        body: JSON.stringify({ receiver_id: receiverId, text })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status !== 'success') throw new Error(data.message || 'Unable to send message');
+    fetchJson('/communication-send-api/', { method: 'POST', headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()}, body: JSON.stringify({ receiver_id: receiverId, text }) })
+    .then(() => {
         input.value = '';
         openCommunicationChat(receiverId);
     })
@@ -995,7 +1066,14 @@ function updateWorkspace(title, desc, html = '') {
     if (titleEl) titleEl.innerText = title;
     
     const viewEl = document.getElementById('workspace-view');
-    if (viewEl) viewEl.innerHTML = html;
+    if (viewEl) {
+        viewEl.innerHTML = html;
+        // prevent global i18n from wiping dynamic workspace content by
+        // removing the data-i18n marker on the container itself while
+        // preserving data-i18n attributes of inserted children
+        if (viewEl.hasAttribute('data-i18n')) viewEl.removeAttribute('data-i18n');
+        if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
+    }
 }
 
 function setActiveClass(el) {
@@ -1039,21 +1117,17 @@ function loadReviewComments() {
         </div>
     `;
 
-    updateWorkspace('Review comments', '', html);
+    updateWorkspace('', '', html);
+    // mark workspace title for translation
+    const wt = document.getElementById('workspace-title');
+    if (wt) wt.setAttribute('data-i18n', 'menu.review_comments');
+    if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
     refreshReviewComments();
 }
 
 function refreshReviewComments() {
-    fetch('/review-comments-api/')
-        .then(async response => {
-            const text = await response.text();
-            let data;
-            try {
-                data = JSON.parse(text);
-            } catch (err) {
-                throw new Error(text || 'Unexpected response from server');
-            }
-            if (data.status !== 'success') throw new Error(data.message || 'Unable to load review data');
+    fetchJson('/review-comments-api/')
+        .then(data => {
             document.getElementById('review-average-rating').innerText = `${data.average_rating.toFixed(1)} / 5`;
             document.getElementById('review-approved-count').innerText = data.approved_count;
             document.getElementById('review-rejected-count').innerText = data.rejected_count;
@@ -1073,7 +1147,8 @@ function renderPendingComments(items) {
     const container = document.getElementById('review-pending-list');
     if (!container) return;
     if (!items.length) {
-        container.innerHTML = '<div class="content-box">No pending comments at the moment.</div>';
+        container.innerHTML = '<div class="content-box" data-i18n="reviews.no_pending">No pending comments at the moment.</div>';
+        if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
         return;
     }
     container.innerHTML = items.map(comment => `
@@ -1087,12 +1162,13 @@ function renderPendingComments(items) {
             </div>
             <p>${comment.text}</p>
             <div class="review-actions">
-                <button class="review-action-btn approve-btn" data-id="${comment.id}" data-action="approve">Approve</button>
-                <button class="review-action-btn reject-btn" data-id="${comment.id}" data-action="reject">Reject</button>
-                <button class="review-action-btn repost-btn" data-id="${comment.id}" data-action="repost">Send back</button>
+                <button class="review-action-btn approve-btn" data-id="${comment.id}" data-action="approve" data-i18n="review.action.approve">Approve</button>
+                <button class="review-action-btn reject-btn" data-id="${comment.id}" data-action="reject" data-i18n="review.action.reject">Reject</button>
+                <button class="review-action-btn repost-btn" data-id="${comment.id}" data-action="repost" data-i18n="review.action.repost">Send back</button>
             </div>
         </div>
     `).join('');
+    if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
     container.querySelectorAll('.review-action-btn').forEach(button => {
         button.addEventListener('click', () => {
             const commentId = button.dataset.id;
@@ -1108,7 +1184,8 @@ function renderReviewLogs(items) {
     const container = document.getElementById('review-logs-list');
     if (!container) return;
     if (!items.length) {
-        container.innerHTML = '<div class="content-box">No recent review actions.</div>';
+        container.innerHTML = '<div class="content-box" data-i18n="reviews.no_logs">No recent review actions.</div>';
+        if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
         return;
     }
     container.innerHTML = items.map(comment => `
@@ -1123,26 +1200,113 @@ function renderReviewLogs(items) {
             <p>${comment.text}</p>
             <div class="review-log-meta">
                 <span class="status-badge ${comment.status}">${comment.status}</span>
-                <span>Reviewed by ${comment.reviewed_by || 'System'}</span>
+                <span data-i18n="">Reviewed by ${comment.reviewed_by || 'System'}</span>
                 ${comment.reviewed_at ? `<span>${comment.reviewed_at}</span>` : ''}
             </div>
         </div>
     `).join('');
+    if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
 }
 
 function submitReviewActions(actions) {
-    fetch('/review-comments-action-api/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCsrfToken()
-        },
-        body: JSON.stringify({ actions })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status !== 'success') throw new Error(data.message || 'Unable to submit actions');
+    fetchJson('/review-comments-action-api/', { method: 'POST', headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()}, body: JSON.stringify({ actions }) })
+    .then(() => {
         refreshReviewComments();
     })
     .catch(error => alert(error.message));
 }
+
+// Settings UI
+function loadSettings() {
+    const html = `
+        <div class="settings-panel" style="padding:20px 16px;">
+            <div class="settings-card" style="max-width:100%; padding:20px;">
+                <h3>Profile</h3>
+                <form id="profile-form">
+                    <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
+                        <div style="flex: 0 0 180px; display:flex; flex-direction:column; align-items:center;">
+                            <div id="avatar-preview" style="width:180px;height:180px;border-radius:50%;overflow:hidden;background:#eee;display:flex;align-items:center;justify-content:center; margin-top:12px"></div>
+                            <div style="margin-top:10px;"><input type="file" id="profile-photo-input" accept="image/*"></div>
+                        </div>
+                        <div style="flex:1; min-width:260px;">
+                            <label style="display:block; margin-bottom:8px;">Nickname<br><input type="text" id="profile-nickname" class="form-input"></label>
+                            <label style="display:block; margin-bottom:8px;">Phone<br><input type="text" id="profile-phone" class="form-input"></label>
+                            <label style="display:block; margin-bottom:8px;">Description<br><textarea id="profile-description" class="form-input" rows="4"></textarea></label>
+                        </div>
+                    </div>
+                    <hr style="margin:18px 0; border-color:#eee">
+                    <div style="margin-top:6px;">
+                        <h4>Change password</h4>
+                        <label style="display:block; margin-bottom:8px;">New password<br><input type="password" id="profile-new-password" class="form-input"></label>
+                        <label style="display:block; margin-bottom:8px;">Confirm new password<br><input type="password" id="profile-new-password-confirm" class="form-input"></label>
+                    </div>
+                    <div style="margin-top:16px;"><button id="profile-save-btn" class="coach-action-btn">Save profile</button></div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    updateWorkspace('Settings', '', html);
+
+    // fetch current profile
+    fetchJson('/profile-api/')
+        .then(data => {
+            if (data.status !== 'success') throw new Error(data.message || 'Unable to load profile');
+            const u = data.user;
+            document.getElementById('profile-nickname').value = u.nickname || '';
+            document.getElementById('profile-phone').value = u.phone || '';
+            document.getElementById('profile-description').value = u.description || '';
+            const preview = document.getElementById('avatar-preview');
+            if (u.avatar) preview.innerHTML = `<img src="${u.avatar}" style="width:100%;height:100%;object-fit:cover">`;
+            else preview.innerHTML = '';
+
+            // photo input preview
+            const photoInput = document.getElementById('profile-photo-input');
+            photoInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const url = URL.createObjectURL(file);
+                preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
+            });
+
+            document.getElementById('profile-save-btn').addEventListener('click', (ev) => {
+                ev.preventDefault();
+                const fd = new FormData();
+                fd.append('nickname', document.getElementById('profile-nickname').value);
+                fd.append('phone', document.getElementById('profile-phone').value);
+                fd.append('description', document.getElementById('profile-description').value);
+                fd.append('new_password', document.getElementById('profile-new-password').value || '');
+                fd.append('new_password_confirm', document.getElementById('profile-new-password-confirm').value || '');
+                const file = document.getElementById('profile-photo-input').files[0];
+                if (file) fd.append('photo', file);
+
+                fetchJson('/profile-api/', { method: 'POST', body: fd, headers: {'X-CSRFToken': getCsrfToken()} })
+                    .then(res => {
+                        alert(window.t ? window.t('alert.profile_updated') : 'Profile updated');
+                    })
+                    .catch(err => alert(err.message || 'Error'));
+            });
+        })
+        .catch(err => {
+            const view = document.getElementById('workspace-view');
+            if (view) view.innerHTML = `<div class="content-box">${err.message}</div>`;
+        });
+}
+
+// hook settings menu item
+document.addEventListener('DOMContentLoaded', () => {
+    const settingsLink = document.getElementById('menu-settings');
+    if (settingsLink) settingsLink.addEventListener('click', (e) => { e.preventDefault(); setActiveClass(settingsLink); loadSettings(); });
+});
+
+// expose core functions for console and ensure availability
+try {
+    window.fetchJson = fetchJson;
+    window.loadCoachManagement = loadCoachManagement;
+    window.loadClientManagement = loadClientManagement;
+    window.loadAttendanceControl = loadAttendanceControl;
+    window.loadReviewComments = loadReviewComments;
+    window.loadCommunication = loadCommunication;
+    window.loadSettings = loadSettings;
+    console.log('cabinet.js: API exposed to window');
+} catch (e) { console.warn('cabinet.js: could not expose to window', e); }

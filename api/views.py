@@ -4,9 +4,82 @@ from django.db.models import Q, Avg
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import update_session_auth_hash
 from django.http import JsonResponse
 from django.utils import timezone
 from .models import User, GymHall, Schedule, Message, Comment
+
+@login_required
+def profile_api(request):
+    user = request.user
+    if request.method == 'GET':
+        return JsonResponse({'status': 'success', 'user': {
+            'email': user.email,
+            'nickname': user.nickname or '',
+            'phone': user.phone or '',
+            'spec': user.spec or '',
+            'description': user.description or '',
+            'avatar': user.photo.url if getattr(user, 'photo', None) else None,
+        }})
+
+    # POST - update profile (accepts multipart/form-data)
+    if request.method == 'POST':
+        try:
+            # gather fields from either JSON or form
+            new_password = None
+            new_password_confirm = None
+
+            if request.content_type and request.content_type.startswith('application/json'):
+                data = json.loads(request.body)
+                nickname = data.get('nickname')
+                phone = data.get('phone')
+                description = data.get('description')
+                spec = data.get('spec')
+                new_password = data.get('new_password')
+                new_password_confirm = data.get('new_password_confirm')
+            else:
+                nickname = request.POST.get('nickname')
+                phone = request.POST.get('phone')
+                description = request.POST.get('description')
+                spec = request.POST.get('spec')
+                new_password = request.POST.get('new_password')
+                new_password_confirm = request.POST.get('new_password_confirm')
+
+            if nickname is not None:
+                user.nickname = nickname
+            if phone is not None:
+                user.phone = phone
+            if description is not None:
+                user.description = description
+            if spec is not None:
+                user.spec = spec
+
+            # password change: only require new password and confirmation (no current password)
+            if new_password or new_password_confirm:
+                if not new_password or not new_password_confirm:
+                    return JsonResponse({'status': 'error', 'message': 'Both new password fields are required'}, status=400)
+                if new_password != new_password_confirm:
+                    return JsonResponse({'status': 'error', 'message': 'New password and confirmation do not match'}, status=400)
+                user.set_password(new_password)
+
+            # handle avatar upload
+            if request.FILES.get('photo'):
+                user.photo = request.FILES.get('photo')
+
+            user.save()
+
+            # If password changed, keep the session authenticated
+            if new_password:
+                try:
+                    update_session_auth_hash(request, user)
+                except Exception:
+                    pass
+
+            return JsonResponse({'status': 'success'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+    return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
 
 def index(request):
     return render(request, 'api/index.html')
@@ -76,6 +149,7 @@ def comments_api(request):
         result.append({
             'id': comment.id,
             'author_name': comment.author.nickname or comment.author.email,
+            'author_avatar': comment.author.photo.url if getattr(comment.author, 'photo', None) else None,
             'rating': comment.rating,
             'text': comment.text,
             'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M'),
@@ -133,6 +207,7 @@ def review_comments_api(request):
         pending_data.append({
             'id': comment.id,
             'author_name': comment.author.nickname or comment.author.email,
+            'author_avatar': comment.author.photo.url if getattr(comment.author, 'photo', None) else None,
             'rating': comment.rating,
             'text': comment.text,
             'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M'),
@@ -143,11 +218,13 @@ def review_comments_api(request):
         logs_data.append({
             'id': comment.id,
             'author_name': comment.author.nickname or comment.author.email,
+            'author_avatar': comment.author.photo.url if getattr(comment.author, 'photo', None) else None,
             'rating': comment.rating,
             'text': comment.text,
             'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M'),
             'status': comment.status,
             'reviewed_by': (comment.reviewed_by.nickname or comment.reviewed_by.email) if comment.reviewed_by else '',
+            'reviewed_by_avatar': comment.reviewed_by.photo.url if getattr(comment.reviewed_by, 'photo', None) else None,
             'reviewed_at': comment.reviewed_at.strftime('%Y-%m-%d %H:%M') if comment.reviewed_at else None,
         })
 

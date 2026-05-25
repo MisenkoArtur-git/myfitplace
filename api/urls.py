@@ -21,4 +21,5 @@ urlpatterns = [
     path('communication-messages-api/', views.communication_messages_api, name='communication_messages_api'),
     path('communication-send-api/', views.communication_send_api, name='communication_send_api'),
     path('logout/', views.logout_view, name='logout'),
+    path('profile-api/', views.profile_api, name='profile_api'),
 ]

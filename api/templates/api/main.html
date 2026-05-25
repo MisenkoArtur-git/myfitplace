@@ -11,73 +11,102 @@
 </head>
 <body>
 
-    <header class="cabinet-header">
+    <header class="main-header">
         <div class="logo-group">
             <span>MyFit.Place</span>
             <i data-lucide="dumbbell" class="icon-logo"></i>
         </div>
-        <div class="user-info-header">
-            <span id="user-display-email">{{ user.nickname|default:user.email }}</span>
-            <span id="user-display-role" class="badge-role">{{ user.role }}</span>
-        </div>
+        <nav class="nav-group">
+            <a href="/" data-i18n="nav.home">Home</a>
+            <a href="#" data-i18n="nav.about">About us</a>
+            <div class="lang-switch" id="lang-switch" style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+                <div class="lang-pill" data-lang="en">EN</div>
+                <div class="lang-pill" data-lang="uk">UA</div>
+            </div>
+            <div class="user-account" style="margin-left:8px; font-weight:700;">
+                <span id="user-display-name">{{ user.nickname|default:user.email }}</span>
+            </div>
+        </nav>
     </header>
 
     <div class="cabinet-layout">
         <aside class="sidebar">
             <nav class="sidebar-menu top-menu">
                 {% if user.role == 'ADMIN' %}
-                    <a href="#" id="menu-coaches" class="menu-item"><i data-lucide="shield-check"></i> Управління тренерами</a>
-                    <a href="#" id="menu-clients" class="menu-item"><i data-lucide="users"></i> Управління клієнтами</a>
-                    <a href="#" id="menu-attendance" class="menu-item"><i data-lucide="activity"></i> Контроль відвідувань</a>
-                    <a href="#" class="menu-item"><i data-lucide="bar-chart-2"></i> Формування звіту</a>
-                    <a href="#" id="menu-review-comments" class="menu-item"><i data-lucide="star"></i> Перевірка коментарів</a>
-                    <a href="#" id="menu-communication" class="menu-item"><i data-lucide="message-square"></i> Комунікація</a>
-                    <a href="#" class="menu-item"><i data-lucide="key"></i> Відновлення паролю</a>
+                    <a href="#" id="menu-coaches" class="menu-item" data-i18n="menu.coaches"><i data-lucide="shield-check"></i> Manage coaches</a>
+                    <a href="#" id="menu-clients" class="menu-item" data-i18n="menu.clients"><i data-lucide="users"></i> Manage clients</a>
+                    <a href="#" id="menu-attendance" class="menu-item" data-i18n="menu.attendance"><i data-lucide="activity"></i> Attendance control</a>
+                    <a href="#" class="menu-item" data-i18n="menu.reports"><i data-lucide="bar-chart-2"></i> Reports</a>
+                    <a href="#" id="menu-review-comments" class="menu-item" data-i18n="menu.review_comments"><i data-lucide="star"></i> Review comments</a>
+                    <a href="#" id="menu-communication" class="menu-item" data-i18n="menu.communication"><i data-lucide="message-square"></i> Communication</a>
+                    <a href="#" class="menu-item" data-i18n="menu.recovery"><i data-lucide="key"></i> Recovery</a>
                 {% elif user.role == 'MANAGER' %}
-                    <a href="#" id="menu-coaches" class="menu-item"><i data-lucide="shield-check"></i> Управління тренерами</a>
-                    <a href="#" id="menu-clients" class="menu-item"><i data-lucide="users"></i> Управління клієнтами</a>
-                    <a href="#" id="menu-attendance" class="menu-item"><i data-lucide="activity"></i> Контроль відвідувань</a>
-                    <a href="#" id="menu-communication" class="menu-item"><i data-lucide="message-square"></i> Комунікація</a>
-                    <a href="#" class="menu-item"><i data-lucide="building"></i> Об'єкти</a>
-                    <a href="#" class="menu-item"><i data-lucide="dollar-sign"></i> Фінанси</a>
-                    <a href="#" class="menu-item"><i data-lucide="user-cog"></i> Адміністратори залу</a>
-                    <a href="#" class="menu-item"><i data-lucide="gavel"></i> Глобальна модерація</a>
-                    <a href="#" class="menu-item"><i data-lucide="settings"></i> Бізнес параметри</a>
+                    <a href="#" id="menu-coaches" class="menu-item" data-i18n="menu.coaches"><i data-lucide="shield-check"></i> Manage coaches</a>
+                    <a href="#" id="menu-clients" class="menu-item" data-i18n="menu.clients"><i data-lucide="users"></i> Manage clients</a>
+                    <a href="#" id="menu-attendance" class="menu-item" data-i18n="menu.attendance"><i data-lucide="activity"></i> Attendance control</a>
+                    <a href="#" id="menu-communication" class="menu-item" data-i18n="menu.communication"><i data-lucide="message-square"></i> Communication</a>
+                    <a href="#" class="menu-item" data-i18n="menu.halls"><i data-lucide="building"></i> Halls</a>
+                    <a href="#" class="menu-item" data-i18n="menu.finance"><i data-lucide="dollar-sign"></i> Finance</a>
+                    <a href="#" class="menu-item" data-i18n="menu.admins"><i data-lucide="user-cog"></i> Hall admins</a>
+                    <a href="#" class="menu-item" data-i18n="menu.moderation"><i data-lucide="gavel"></i> Global moderation</a>
+                    <a href="#" class="menu-item" data-i18n="menu.business"><i data-lucide="settings"></i> Business settings</a>
                 {% elif user.role == 'COACH' %}
-                    <a href="#" class="menu-item"><i data-lucide="dumbbell"></i> Тренування</a>
-                    <a href="#" class="menu-item"><i data-lucide="users"></i> Подивитися клієнтів</a>
-                    <a href="#" class="menu-item"><i data-lucide="message-square"></i> Повідомлення</a>
-                    <a href="#" class="menu-item"><i data-lucide="life-buoy"></i> Звернення до підтримки</a>
+                    <a href="#" class="menu-item" data-i18n="menu.training"><i data-lucide="dumbbell"></i> Training</a>
+                    <a href="#" class="menu-item" data-i18n="menu.view_clients"><i data-lucide="users"></i> View clients</a>
+                    <a href="#" class="menu-item" data-i18n="menu.messages"><i data-lucide="message-square"></i> Messages</a>
+                    <a href="#" class="menu-item" data-i18n="menu.support"><i data-lucide="life-buoy"></i> Support</a>
                 {% elif user.role == 'CLIENT' %}
-                    <a href="#" class="menu-item"><i data-lucide="user"></i> Редагування профілю</a>
-                    <a href="#" class="menu-item"><i data-lucide="search"></i> Фільтр залів</a>
-                    <a href="#" class="menu-item"><i data-lucide="calendar-plus"></i> Запис на тренування</a>
-                    <a href="#" class="menu-item"><i data-lucide="trending-up"></i> Статистика прогресу</a>
-                    <a href="#" class="menu-item"><i data-lucide="message-square"></i> Повідомлення</a>
-                    <a href="#" class="menu-item"><i data-lucide="life-buoy"></i> Звернення до підтримки</a>
+                    <a href="#" class="menu-item" data-i18n="menu.profile_edit"><i data-lucide="user"></i> Edit profile</a>
+                    <a href="#" class="menu-item" data-i18n="menu.hall_filter"><i data-lucide="search"></i> Hall filter</a>
+                    <a href="#" class="menu-item" data-i18n="menu.book_training"><i data-lucide="calendar-plus"></i> Book training</a>
+                    <a href="#" class="menu-item" data-i18n="menu.progress"><i data-lucide="trending-up"></i> Progress stats</a>
+                    <a href="#" class="menu-item" data-i18n="menu.messages"><i data-lucide="message-square"></i> Messages</a>
+                    <a href="#" class="menu-item" data-i18n="menu.support"><i data-lucide="life-buoy"></i> Support</a>
                 {% endif %}
             </nav>
 
             <nav class="sidebar-menu bottom-menu">
                 <hr class="menu-divider">
-                <a href="/" id="back-to-site-btn" class="menu-item"><i data-lucide="arrow-left"></i> Back to site</a>
-                <a href="#" class="menu-item"><i data-lucide="settings"></i> Settings</a>
-                <a href="#" class="menu-item"><i data-lucide="help-circle"></i> Help</a>
-                <a href="{% url 'logout' %}" id="logout-btn" class="menu-item logout-link"><i data-lucide="log-out"></i> Log Out</a>
+                <a href="/" id="back-to-site-btn" class="menu-item" data-i18n="menu.back"> <i data-lucide="arrow-left"></i> Back to site</a>
+                <a href="#" id="menu-settings" class="menu-item" data-i18n="menu.settings"><i data-lucide="settings"></i> Settings</a>
+                <a href="#" class="menu-item" data-i18n="menu.help"><i data-lucide="help-circle"></i> Help</a>
+                <a href="{% url 'logout' %}" id="logout-btn" class="menu-item logout-link" data-i18n="menu.logout"><i data-lucide="log-out"></i> Log Out</a>
             </nav>
         </aside>
 
         <main class="content-area">
             <div class="work-window">
-                <h2 id="workspace-title">Welcome to your dashboard</h2>
-                <div id="workspace-view" class="workspace-view">
+                <h2 id="workspace-title" data-i18n="workspace.title">Welcome to your dashboard</h2>
+                <div id="workspace-view" class="workspace-view" data-i18n="workspace.default"> 
                     <p>Select an action from the sidebar menu to interact with system options.</p>
                 </div>
             </div>
         </main>
     </div>
 
+    <script src="{% static 'js/i18n.js' %}"></script>
     <script src="{% static 'js/cabinet.js' %}"></script>
+    <script>
+        // explicit local handler to ensure pill clicks persist language and re-apply translations
+        document.addEventListener('DOMContentLoaded', () => {
+            const ls = document.getElementById('lang-switch');
+            const cur = localStorage.getItem('site_lang') || 'en';
+            if (window.applyTranslations) window.applyTranslations(cur);
+            if (!ls) return;
+            function refresh() {
+                ls.querySelectorAll('.lang-pill').forEach(p => p.classList.toggle('active', p.getAttribute('data-lang') === (localStorage.getItem('site_lang') || 'en')));
+            }
+            refresh();
+            ls.addEventListener('click', (e) => {
+                const pill = e.target.closest('.lang-pill');
+                if (!pill) return;
+                const chosen = pill.getAttribute('data-lang') || 'en';
+                localStorage.setItem('site_lang', chosen);
+                if (window.applyTranslations) window.applyTranslations(chosen);
+                refresh();
+            });
+        });
+    </script>
     <script>lucide.createIcons();</script>
 </body>
 </html>

@@ -16,16 +16,17 @@
             <i data-lucide="dumbbell" class="icon-logo"></i>
         </div>
         <nav class="nav-group">
-            <a href="#">About us</a>
-            <a href="#">Home</a>
-            <div class="lang-switch">
-                <i data-lucide="languages" class="icon-small"></i> EN/UA
+            <a href="#" data-i18n="nav.about">About us</a>
+            <a href="#" data-i18n="nav.home">Home</a>
+            <div class="lang-switch" id="lang-switch" style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+                <div class="lang-pill" data-lang="en">EN</div>
+                <div class="lang-pill" data-lang="uk">UA</div>
             </div>
             {% if user.is_authenticated %}
-                <a href="/cabinet/" class="btn btn-login">Cabinet</a>
-                <a href="{% url 'logout' %}" class="btn btn-login">Logout</a>
+                <a href="/cabinet/" class="btn btn-login" data-i18n="nav.cabinet">Cabinet</a>
+                <a href="{% url 'logout' %}" class="btn btn-login" data-i18n="nav.logout">Logout</a>
             {% else %}
-                <button class="btn btn-login" id="open-auth-btn">Login/Sign Up</button>
+                <button class="btn btn-login" id="open-auth-btn" data-i18n="nav.login">Login/Sign Up</button>
             {% endif %}
         </nav>
     </header>
@@ -33,7 +34,7 @@
     <main>
         <section class="hero-block">
             <div class="text-side">
-                <h1 class="title-large">TRAIN HARD. <span class="text-green">LIVE BETTER</span></h1>
+                <h1 class="title-large" data-i18n="hero.title">TRAIN HARD. <span class="text-green" data-i18n="hero.highlight">LIVE BETTER</span></h1>
                 <p>Train like an athlete with top-tier equipment and expert programming. Whether you're building muscle or breaking PRs, we help you push past limits.</p>
             </div>
             <div class="img-side">
@@ -46,40 +47,48 @@
                 <img src="https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?q=80&w=1000" alt="Mission">
             </div>
             <div class="text-side">
-                <h2 class="title-large">OUR MISSION</h2>
-                <p>Our mission is to provide a high-energy, no-nonsense environment where results are forged. We don't do excuses—we do execution.</p>
+                <h2 class="title-large" data-i18n="mission.title">OUR MISSION</h2>
+                <p data-i18n="mission.text">Our mission is to provide a high-energy, no-nonsense environment where results are forged. We don't do excuses—we do execution.</p>
             </div>
         </section>
 
         <section class="cta-banner-section">
-            <p class="cta-subtitle">WHAT WE BELIEVE IN</p>
-            <h2 class="cta-title">JOIN THE PRIMAL TRIBE TODAY!</h2>
-            <button class="btn btn-white-lg" id="cta-join-btn">JOIN US</button>
+            <p class="cta-subtitle" data-i18n="cta.subtitle">WHAT WE BELIEVE IN</p>
+            <h2 class="cta-title" data-i18n="cta.title">JOIN THE PRIMAL TRIBE TODAY!</h2>
+            <button class="btn btn-white-lg" id="cta-join-btn" data-i18n="cta.join">JOIN US</button>
         </section>
         
         <!-- Reviews section (full width) placed under CTA -->
         <section class="reviews-section">
             <div class="reviews-container">
-                <h2>Reviews</h2>
+                <h2 data-i18n="reviews.title">Reviews</h2>
                 <div class="reviews-list-wrapper">
                     <div class="reviews-left">
-                        <div class="comments-list" id="comments-list-full"></div>
-                    </div>
-
-                    <aside class="reviews-right">
                         <div class="comment-input-area">
-                            <div id="comment-stars-full" class="stars-rating" style="display:flex; gap:8px; justify-content:center; margin-bottom:12px;">
+                            <div id="comment-stars-full" class="stars-rating" style="display:flex; gap:8px; justify-content:center; margin-bottom:6px;">
                                 <span class="star" data-value="1">★</span>
                                 <span class="star" data-value="2">★</span>
                                 <span class="star" data-value="3">★</span>
                                 <span class="star" data-value="4">★</span>
                                 <span class="star" data-value="5">★</span>
                             </div>
-                            <input type="hidden" id="comment-rating-full" value="0">
+                            <!-- Radio-style controls under stars -->
+                            <div class="rating-radios" style="display:flex; gap:18px; justify-content:center; margin-bottom:12px;">
+                                <label class="radio-label"><input type="radio" name="rating-full" value="1"><span class="radio-dot"></span></label>
+                                <label class="radio-label"><input type="radio" name="rating-full" value="2"><span class="radio-dot"></span></label>
+                                <label class="radio-label"><input type="radio" name="rating-full" value="3"><span class="radio-dot"></span></label>
+                                <label class="radio-label"><input type="radio" name="rating-full" value="4"><span class="radio-dot"></span></label>
+                                <label class="radio-label"><input type="radio" name="rating-full" value="5" checked><span class="radio-dot"></span></label>
+                            </div>
+                            <input type="hidden" id="comment-rating-full" value="5">
                             <textarea id="comment-text-full" class="comment-input-large" placeholder="Write your review..."></textarea>
-                            <button id="submit-comment-full" class="btn btn-submit" data-auth="{% if user.is_authenticated %}1{% else %}0{% endif %}">Send</button>
-                            <p class="comments-note">Reviews are moderated and may appear after approval.</p>
+                            <button id="submit-comment-full" class="btn btn-submit" data-auth="{% if user.is_authenticated %}1{% else %}0{% endif %}" data-i18n="comments.send">Send</button>
+                            <p class="comments-note" data-i18n="reviews.note">Reviews are moderated and may appear after approval.</p>
                         </div>
+                    </div>
+
+                    <aside class="reviews-right">
+                        <div class="comments-list" id="comments-list-full"></div>
                     </aside>
                 </div>
             </div>
@@ -94,28 +103,34 @@
                     <span>MyFit.Place</span>
                 </div>
             </div>
+
+            <hr class="footer-sep">
+
             <div class="footer-bottom">
-                <div class="footer-col">
-                    <h4>CONTACT</h4>
+                <div class="footer-col contact-col">
+                    <h4 data-i18n="footer.contact">CONTACT</h4>
                     <ul>
-                        <li>Email: info@myfit.place</li>
+                        <li>Email: <a href="mailto:info@myfit.place">info@myfit.place</a></li>
                         <li>Phone: (096) 555-5555</li>
                     </ul>
                 </div>
-                <div class="footer-col hours-split">
-                    <h4>OPENING HOURS</h4>
+
+                <div class="footer-col hours-col">
+                    <h4 data-i18n="footer.hours">OPENING HOURS</h4>
                     <div class="hours-grid">
-                        <span>MON – FRI</span> <span>5:00 – 23:00</span>
-                        <span>SATURDAYS</span> <span>8:00 – 16:00</span>
-                        <span>SUNDAYS</span> <span>8:00 – 13:00</span>
-                        <span>HOLIDAYS</span> <span>8:00 – 16:00</span>
+                        <span data-i18n="footer.monfri">MON – FRI</span>
+                        <span data-i18n="footer.monfri_time">5:00 – 23:00</span>
+                        <span data-i18n="footer.sat">SATURDAYS</span>
+                        <span data-i18n="footer.sat_time">8:00 – 16:00</span>
+                        <span data-i18n="footer.sun">SUNDAYS</span>
+                        <span data-i18n="footer.sun_time">8:00 – 13:00</span>
+                        <span data-i18n="footer.holidays">HOLIDAYS</span>
+                        <span data-i18n="footer.holidays_time">8:00 – 16:00</span>
                     </div>
                 </div>
-                <div class="footer-col comments-col">
-                    <!-- Reviews moved to full-width section above footer -->
-                </div>
+
                 <div class="footer-col social-col">
-                    <h4>SOCIAL</h4>
+                    <h4 data-i18n="footer.social">SOCIAL</h4>
                     <ul>
                         <li><a href="#">Instagram</a></li>
                         <li><a href="#">Telegram</a></li>
@@ -168,6 +183,7 @@
         </div>
     </div>
 
+    <script src="{% static 'js/i18n.js' %}"></script>
     <script src="{% static 'js/auth.js' %}"></script>
     <script>lucide.createIcons();</script>
 </body>

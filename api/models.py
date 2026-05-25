@@ -96,7 +96,7 @@ class Comment(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
-    reviewed_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='reviewed_comments')
+    reviewed_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.CASCADE, related_name='reviewed_comments')
 
     class Meta:
         ordering = ['-created_at']

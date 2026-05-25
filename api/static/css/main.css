@@ -31,6 +31,49 @@ body {
     height: 70px; 
 }
 
+/* Match the public site's main header styling so cabinet header looks identical */
+.main-header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    padding: 20px 40px; 
+    background-color: var(--green); 
+}
+
+.nav-group { 
+    display: flex !important; 
+    align-items: center !important; 
+    gap: 20px !important; 
+}
+
+.nav-group a, .nav-group button { 
+    color: var(--white) !important; 
+    text-decoration: none !important; 
+    font-weight: 700 !important; 
+}
+
+.btn-login { 
+    background-color: var(--dark-green); 
+    color: var(--white); 
+    padding: 8px 14px; 
+    border-radius: 18px; 
+    border: none; 
+    cursor: pointer;
+}
+
+.lang-pill { 
+    background: rgba(255,255,255,0.12); 
+    color: white; 
+    padding: 6px 10px; 
+    border-radius: 999px; 
+    font-weight: 800; 
+}
+
+.lang-pill.active { 
+    background: var(--white); 
+    color: var(--dark-green); 
+}
+
 .logo-group { 
     display: flex; 
     align-items: center; 
