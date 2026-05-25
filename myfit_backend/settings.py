@@ -79,6 +79,13 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'api' / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# Настройка WhiteNoise для хранения и сжатия статики
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
 # --- ВАЖНЫЕ НАСТРОЙКИ ---
 AUTH_USER_MODEL = 'api.User'
 MEDIA_URL = '/media/'
