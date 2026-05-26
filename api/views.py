@@ -7,13 +7,14 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import update_session_auth_hash
 from django.http import JsonResponse
 from django.utils import timezone
-from .models import User, GymHall, Schedule, Message, Comment
+from .models import User, GymHall, Schedule, Message, Comment, Conversation
 
 @login_required
 def profile_api(request):
     user = request.user
     if request.method == 'GET':
         return JsonResponse({'status': 'success', 'user': {
+            'id': user.id,
             'email': user.email,
             'nickname': user.nickname or '',
             'phone': user.phone or '',
@@ -446,39 +447,75 @@ def attendance_save_api(request):
 
 @login_required
 def communication_users_api(request):
-    if request.user.role not in ['ADMIN', 'MANAGER']:
-        return JsonResponse({'status': 'error', 'message': 'Forbidden'}, status=403)
+    # Admins and managers: show full user list only when explicitly requested
+    # (e.g. /communication-users-api/?all=1). Otherwise behave like regular users
+    # and return only existing chats/conversations. This prevents admin from
+    # seeing every user after logout/login unless they asked for it.
+    if request.user.role in ['ADMIN', 'MANAGER'] and request.GET.get('all') == '1':
+        contacts = []
+        users = User.objects.filter(role__in=['COACH', 'CLIENT']).order_by('role', 'nickname')
+        for user in users:
+            last_message = Message.objects.filter(
+                Q(sender=request.user, receiver=user) | Q(sender=user, receiver=request.user)
+            ).order_by('-created_at').first()
+
+            contacts.append({
+                'id': user.id,
+                'nickname': user.nickname or user.email,
+                'email': user.email,
+                'role': user.role,
+                'hall_name': user.hall.name if user.hall else '',
+                'last_message': last_message.text if last_message else '',
+                'last_date': last_message.created_at.strftime('%Y-%m-%d %H:%M') if last_message else '',
+            })
+
+        return JsonResponse({'status': 'success', 'contacts': contacts})
+
+    # Regular users: do not expose full user list. Return only users with whom
+    # the current user already exchanged messages OR have an explicit Conversation
+    # (empty chat created via Add). This prevents exposing all users to regular users.
+    ids = set()
+    # message participants
+    message_pairs = Message.objects.filter(Q(sender=request.user) | Q(receiver=request.user)).values_list('sender', 'receiver')
+    for s, r in message_pairs:
+        ids.add(s)
+        ids.add(r)
+    # conversation participants
+    convs = Conversation.objects.filter(Q(user_a=request.user) | Q(user_b=request.user))
+    for conv in convs:
+        ids.add(conv.user_a_id)
+        ids.add(conv.user_b_id)
+    ids.discard(request.user.id)
 
     contacts = []
-    users = User.objects.filter(role__in=['COACH', 'CLIENT']).order_by('role', 'nickname')
-    for user in users:
-        last_message = Message.objects.filter(
-            Q(sender=request.user, receiver=user) | Q(sender=user, receiver=request.user)
-        ).order_by('-created_at').first()
+    if ids:
+        users = User.objects.filter(id__in=ids).order_by('nickname')
+        for user in users:
+            last_message = Message.objects.filter(
+                Q(sender=request.user, receiver=user) | Q(sender=user, receiver=request.user)
+            ).order_by('-created_at').first()
 
-        contacts.append({
-            'id': user.id,
-            'nickname': user.nickname or user.email,
-            'email': user.email,
-            'role': user.role,
-            'hall_name': user.hall.name if user.hall else '',
-            'last_message': last_message.text if last_message else '',
-            'last_date': last_message.created_at.strftime('%Y-%m-%d %H:%M') if last_message else '',
-        })
+            contacts.append({
+                'id': user.id,
+                'nickname': user.nickname or user.email,
+                'email': user.email,
+                'role': user.role,
+                'hall_name': user.hall.name if user.hall else '',
+                'last_message': last_message.text if last_message else '',
+                'last_date': last_message.created_at.strftime('%Y-%m-%d %H:%M') if last_message else '',
+            })
 
     return JsonResponse({'status': 'success', 'contacts': contacts})
 
 
 @login_required
 def communication_messages_api(request):
-    if request.user.role not in ['ADMIN', 'MANAGER']:
-        return JsonResponse({'status': 'error', 'message': 'Forbidden'}, status=403)
-
+    # Allow all authenticated users to fetch messages with a specific user.
     other_id = request.GET.get('other_id')
     if not other_id:
         return JsonResponse({'status': 'error', 'message': 'receiver id is required'}, status=400)
 
-    other = User.objects.filter(id=other_id, role__in=['COACH', 'CLIENT']).first()
+    other = User.objects.filter(id=other_id).first()
     if not other:
         return JsonResponse({'status': 'error', 'message': 'User not found'}, status=404)
 
@@ -490,6 +527,7 @@ def communication_messages_api(request):
             'id': msg.id,
             'sender_id': msg.sender.id,
             'receiver_id': msg.receiver.id,
+            'is_sent': msg.sender_id == request.user.id,
             'text': msg.text,
             'created_at': msg.created_at.strftime('%Y-%m-%d %H:%M'),
         })
@@ -504,9 +542,6 @@ def communication_messages_api(request):
 
 @login_required
 def communication_send_api(request):
-    if request.user.role not in ['ADMIN', 'MANAGER']:
-        return JsonResponse({'status': 'error', 'message': 'Forbidden'}, status=403)
-
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
 
@@ -517,11 +552,112 @@ def communication_send_api(request):
     if not receiver_id or not text:
         return JsonResponse({'status': 'error', 'message': 'receiver_id and text are required'}, status=400)
 
-    receiver = User.objects.filter(id=receiver_id, role__in=['COACH', 'CLIENT']).first()
+    receiver = User.objects.filter(id=receiver_id).first()
     if not receiver:
         return JsonResponse({'status': 'error', 'message': 'User not found'}, status=404)
 
     Message.objects.create(sender=request.user, receiver=receiver, text=text)
+    return JsonResponse({'status': 'success'})
+
+
+@login_required
+def communication_find_api(request):
+    # Search a user by id. Used by non-admin users to start a dialog when they
+    # know the target id. Returns limited profile data only.
+    if request.method != 'GET':
+        return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+
+    other_id = request.GET.get('id') or request.GET.get('user_id')
+    if not other_id:
+        return JsonResponse({'status': 'error', 'message': 'id is required'}, status=400)
+
+    try:
+        other = User.objects.filter(id=int(other_id)).first()
+    except Exception:
+        other = None
+
+    if not other or other.id == request.user.id:
+        return JsonResponse({'status': 'error', 'message': 'User not found'}, status=404)
+
+    user_data = {
+        'id': other.id,
+        'nickname': other.nickname or other.email,
+        'email': other.email,
+        'role': other.role,
+        'hall_name': other.hall.name if other.hall else '',
+        'photo_url': request.build_absolute_uri(other.photo.url) if other.photo else '',
+    }
+
+    return JsonResponse({'status': 'success', 'user': user_data})
+
+
+@login_required
+def communication_add_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+
+    data = json.loads(request.body.decode('utf-8')) if request.body else {}
+    other_id = data.get('user_id') or data.get('other_id') or data.get('id')
+    text = data.get('text', '')
+    if not other_id:
+        return JsonResponse({'status': 'error', 'message': 'user_id is required'}, status=400)
+
+    try:
+        other = User.objects.filter(id=int(other_id)).first()
+    except Exception:
+        other = None
+
+    if not other or other.id == request.user.id:
+        return JsonResponse({'status': 'error', 'message': 'User not found'}, status=404)
+
+    # If any message exists between users, or a Conversation exists, consider chat present.
+    exists = Message.objects.filter(
+        Q(sender=request.user, receiver=other) | Q(sender=other, receiver=request.user)
+    ).exists()
+    conv_exists = Conversation.objects.filter(
+        Q(user_a=request.user, user_b=other) | Q(user_a=other, user_b=request.user)
+    ).exists()
+
+    if not exists and not conv_exists:
+        # create a Conversation record (no visible message) so both users see the chat
+        # normalize ordering: smaller id -> user_a to satisfy unique_together
+        try:
+            a, b = (request.user, other) if request.user.id <= other.id else (other, request.user)
+            Conversation.objects.create(user_a=a, user_b=b)
+        except Exception:
+            # ignore race/unique errors
+            pass
+
+    return JsonResponse({'status': 'success'})
+
+
+@login_required
+def communication_delete_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+
+    data = json.loads(request.body.decode('utf-8')) if request.body else {}
+    other_id = data.get('user_id') or data.get('other_id') or data.get('id')
+    if not other_id:
+        return JsonResponse({'status': 'error', 'message': 'user_id is required'}, status=400)
+
+    try:
+        other = User.objects.filter(id=int(other_id)).first()
+    except Exception:
+        other = None
+
+    if not other or other.id == request.user.id:
+        return JsonResponse({'status': 'error', 'message': 'User not found'}, status=404)
+
+    # Delete all messages between the two users and remove Conversation if exists
+    Message.objects.filter(
+        Q(sender=request.user, receiver=other) | Q(sender=other, receiver=request.user)
+    ).delete()
+    # remove conversation record (both ordering variants)
+    Conversation.objects.filter(
+        Q(user_a=request.user, user_b=other) | Q(user_a=other, user_b=request.user)
+    ).delete()
+
     return JsonResponse({'status': 'success'})
 
 

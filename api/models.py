@@ -79,6 +79,24 @@ class Message(models.Model):
     def __str__(self):
         return f"Message from {self.sender.email} to {self.receiver.email} at {self.created_at}"
 
+
+class Conversation(models.Model):
+    """Represents a chat existence between two users without requiring a message.
+
+    This allows creating an empty chat (visible in UI) while keeping messages
+    in the `Message` model. Conversations are undirected: user_a/user_b order
+    is normalized so there is only one Conversation per pair.
+    """
+    user_a = models.ForeignKey(User, on_delete=models.CASCADE, related_name='conversations_a')
+    user_b = models.ForeignKey(User, on_delete=models.CASCADE, related_name='conversations_b')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = (('user_a', 'user_b'),)
+
+    def __str__(self):
+        return f"Conversation: {self.user_a.email} <-> {self.user_b.email}"
+
 class Comment(models.Model):
     STATUS_PENDING = 'PENDING'
     STATUS_APPROVED = 'APPROVED'

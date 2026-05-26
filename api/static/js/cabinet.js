@@ -108,6 +108,41 @@ function initCabinet() {
         });
     });
 
+    // Mobile toolbar interaction: delegate clicks from mobile toolbar buttons
+    const mobileToolbar = document.querySelector('.mobile-toolbar');
+    if (mobileToolbar) {
+        mobileToolbar.addEventListener('click', (e) => {
+            const btn = e.target.closest('.mobile-item');
+            if (!btn) return;
+            e.preventDefault();
+            const targetId = btn.getAttribute('data-target');
+            if (!targetId) return;
+            // Try to find sidebar menu element with this id and trigger its click
+            const sidebarEl = document.getElementById(targetId);
+            if (sidebarEl) {
+                sidebarEl.click();
+                // Visually mark active on toolbar
+                mobileToolbar.querySelectorAll('.mobile-item').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                return;
+            }
+            // Fallback: map known targets to functions
+            const fnMap = {
+                'menu-coaches': loadCoachManagement,
+                'menu-clients': loadClientManagement,
+                'menu-attendance': loadAttendanceControl,
+                'menu-communication': loadCommunication,
+                'menu-settings': loadSettings,
+                'menu-review-comments': loadReviewComments
+            };
+            if (fnMap[targetId]) {
+                fnMap[targetId]();
+                mobileToolbar.querySelectorAll('.mobile-item').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            }
+        });
+    }
+
     // Also attach delegated handler in case menu nodes are replaced by other scripts
     document.body.addEventListener('click', function(e) {
         const el = e.target.closest('.sidebar .menu-item');
@@ -722,11 +757,11 @@ function loadAttendanceControl() {
                     <select id="attendance-hall"></select>
                 </div>
                 <div class="filter-group">
-                    <label for="attendance-start" data-i18n="label.date">Start date</label>
+                    <label for="attendance-start" data-i18n="attendance.filter_from">From date</label>
                     <input id="attendance-start" type="date">
                 </div>
                 <div class="filter-group">
-                    <label for="attendance-end" data-i18n="label.date">End date</label>
+                    <label for="attendance-end" data-i18n="attendance.filter_to">To date</label>
                     <input id="attendance-end" type="date">
                 </div>
                 <div class="filter-group">
@@ -917,7 +952,14 @@ function loadCommunication() {
             <div class="contacts-panel">
                 <div class="contacts-panel-header">
                     <h3 data-i18n="communication.chats_label">Chats</h3>
-                    <input id="communication-search" type="search" data-i18n="communication.search_placeholder" placeholder="">
+                    <div class="communication-controls">
+                        <input id="communication-search" type="search" data-i18n="communication.search_placeholder" placeholder="">
+                        <input id="communication-add-id" type="text" placeholder="User ID">
+                        <div class="communication-id-btns">
+                            <button id="communication-add-btn" class="coach-action-btn" data-i18n="communication.add">Add</button>
+                            <button id="communication-del-btn" class="coach-action-btn secondary danger" data-i18n="communication.delete">Del</button>
+                        </div>
+                    </div>
                 </div>
                 <div id="communication-contacts" class="contacts-list"></div>
             </div>
@@ -939,9 +981,42 @@ function loadCommunication() {
     if (wt) wt.setAttribute('data-i18n', COMMUNICATION_TITLE);
     if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
     document.getElementById('communication-search')?.addEventListener('input', () => {
-        renderCommunicationContacts(filterCommunicationContacts(document.getElementById('communication-search').value));
+        const input = document.getElementById('communication-search');
+        const val = input ? input.value.trim() : '';
+        if (!val) {
+            renderCommunicationContacts(communicationContacts);
+            return;
+        }
+
+        // If user types only digits, treat as id lookup and ask server
+        if (/^\d+$/.test(val)) {
+            fetchJson(`/communication-find-api/?id=${encodeURIComponent(val)}`)
+                .then(data => {
+                    const u = data.user;
+                    const contact = [{
+                        id: u.id,
+                        nickname: u.nickname,
+                        email: u.email,
+                        role: u.role,
+                        hall_name: u.hall_name || '',
+                        last_message: '',
+                        last_date: ''
+                    }];
+                    renderCommunicationContacts(contact);
+                })
+                .catch(() => {
+                    // no user found — show empty list
+                    renderCommunicationContacts([]);
+                });
+            return;
+        }
+
+        renderCommunicationContacts(filterCommunicationContacts(val));
     });
     document.getElementById('communication-send-btn')?.addEventListener('click', sendCommunicationMessage);
+    document.getElementById('communication-add-btn')?.addEventListener('click', addCommunicationById);
+    document.getElementById('communication-del-btn')?.addEventListener('click', delCommunicationById);
+    document.getElementById('communication-add-id')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') addCommunicationById(); });
     refreshCommunicationContacts();
 }
 
@@ -967,14 +1042,14 @@ function renderCommunicationContacts(contacts) {
 
     container.innerHTML = contacts.map(contact => `
         <div class="contact-item ${contact.id === activeCommunicationUserId ? 'active' : ''}" data-contact-id="${contact.id}">
-            <div>
+            <div class="contact-main">
                 <h4>${contact.nickname}</h4>
-                <p>${contact.email}</p>
-                <p class="contact-meta">${contact.role} ${contact.hall_name ? '| Hall: ' + contact.hall_name : ''}</p>
+                <p class="contact-email">${contact.email}</p>
+                ${contact.hall_name ? `<p class="contact-hall">Hall: ${contact.hall_name}</p>` : ''}
             </div>
             <div class="contact-last">
-                ${contact.last_date ? `<p class="contact-meta">${contact.last_date}</p>` : ''}
-                ${contact.last_message ? `<p class="contact-snippet">${contact.last_message.slice(0, 45)}</p>` : '<p class="contact-meta">Немає повідомлень</p>'}
+                ${contact.last_date ? `<p class="contact-date">${contact.last_date}</p>` : ''}
+                ${contact.last_message ? `<p class="contact-snippet">${contact.last_message.slice(0, 80)}</p>` : '<p class="contact-meta">Немає повідомлень</p>'}
             </div>
         </div>
     `).join('');
@@ -987,6 +1062,8 @@ function renderCommunicationContacts(contacts) {
             }
         });
     });
+
+    // no per-contact delete buttons; deletion is done via Del button with id input
 }
 
 function filterCommunicationContacts(query) {
@@ -1005,18 +1082,89 @@ function openCommunicationChat(contactId) {
     const contact = communicationContacts.find(item => String(item.id) === String(contactId));
     const heading = document.getElementById('chat-heading');
     if (heading && contact) {
-        heading.innerText = `Чат з ${contact.nickname}`;
+        heading.innerText = `Чат з ${contact.nickname} (ID: ${contact.id})`;
     }
     document.getElementById('communication-message-input').value = '';
     fetchJson(`/communication-messages-api/?other_id=${contactId}`)
         .then(data => {
             communicationMessages = data.messages || [];
+            // store server-declared "other" id to reliably compute ownership
+            try { window._COMM_OTHER_ID = data.other && data.other.id ? Number(data.other.id) : null; } catch(e) { window._COMM_OTHER_ID = null; }
             renderCommunicationMessages();
             renderCommunicationContacts(filterCommunicationContacts(document.getElementById('communication-search').value));
+            // update heading with server-returned other info (ensures id present)
+            try {
+                if (data.other && heading) {
+                    heading.innerText = `Чат з ${data.other.nickname} (ID: ${data.other.id})`;
+                }
+            } catch (e) {}
         })
         .catch(error => {
             document.getElementById('communication-messages').innerHTML = `<div class="content-box">${error.message}</div>`;
         });
+}
+
+function addCommunicationById() {
+    const input = document.getElementById('communication-add-id');
+    const val = input ? input.value.trim() : '';
+    if (!val) {
+        alert(window.t ? window.t('alert.enter_user_id') : 'Enter user id');
+        return;
+    }
+
+    fetchJson('/communication-add-api/', { method: 'POST', headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()}, body: JSON.stringify({ user_id: val }) })
+        .then(() => {
+            input.value = '';
+            // fetch the user's limited profile and add to local contacts list
+            return fetchJson(`/communication-find-api/?id=${encodeURIComponent(val)}`)
+                .then(data => {
+                    const u = data.user;
+                    const contact = {
+                        id: u.id,
+                        nickname: u.nickname,
+                        email: u.email,
+                        role: u.role,
+                        hall_name: u.hall_name || '',
+                        last_message: '',
+                        last_date: ''
+                    };
+                    // ensure no duplicate
+                    communicationContacts = (communicationContacts || []).filter(c => String(c.id) !== String(contact.id));
+                    communicationContacts.unshift(contact);
+                    renderCommunicationContacts(communicationContacts);
+                    // open the new chat
+                    openCommunicationChat(contact.id);
+                })
+                .catch(() => {
+                    // If we can't fetch the profile, fallback to refreshing the list
+                    refreshCommunicationContacts();
+                });
+        })
+        .catch(err => alert(err.message || 'Error'));
+}
+
+function delCommunicationById() {
+    const input = document.getElementById('communication-add-id');
+    const val = input ? input.value.trim() : '';
+    if (!val) {
+        alert(window.t ? window.t('alert.enter_user_id') : 'Enter user id');
+        return;
+    }
+    if (!confirm(window.t ? window.t('confirm.delete_chat') : 'Delete this chat and all messages?')) return;
+
+    fetchJson('/communication-delete-api/', { method: 'POST', headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()}, body: JSON.stringify({ user_id: val }) })
+        .then(() => {
+            input.value = '';
+            if (Number(val) === activeCommunicationUserId) {
+                activeCommunicationUserId = null;
+                document.getElementById('communication-messages').innerHTML = '';
+                document.getElementById('chat-heading').innerText = window.t ? window.t('communication.select_chat') : 'Select a chat to start';
+            }
+            // remove contact locally so it disappears for the current user immediately
+            communicationContacts = (communicationContacts || []).filter(c => String(c.id) !== String(val));
+            renderCommunicationContacts(communicationContacts);
+        })
+        .catch(err => alert(err.message || 'Error'));
 }
 
 function renderCommunicationMessages() {
@@ -1034,7 +1182,25 @@ function renderCommunicationMessages() {
     }
 
     container.innerHTML = communicationMessages.map(msg => {
-        const isSent = msg.sender_id !== activeCommunicationUserId;
+        // prefer server-provided 'other' id (the chat peer) when available
+        const otherId = (typeof window._COMM_OTHER_ID !== 'undefined') ? window._COMM_OTHER_ID : (activeCommunicationUserId || null);
+        const currentUser = (typeof window.CURRENT_USER_ID !== 'undefined' && window.CURRENT_USER_ID !== null) ? Number(window.CURRENT_USER_ID) : null;
+        const serverFlag = (typeof msg.is_sent !== 'undefined') ? Boolean(msg.is_sent) : null;
+        const localFlag = (currentUser !== null) ? (Number(msg.sender_id) === currentUser) : null;
+        let isSent;
+        if (otherId !== null) {
+            // message is sent by current user when sender_id !== otherId
+            isSent = Number(msg.sender_id) !== Number(otherId);
+        } else if (serverFlag !== null && localFlag === null) {
+            isSent = serverFlag;
+        } else if (localFlag !== null) {
+            isSent = localFlag;
+        } else if (serverFlag !== null) {
+            isSent = serverFlag;
+        } else {
+            isSent = false;
+        }
+        console.debug('renderCommunicationMessages:', { otherId, currentUser, sender: msg.sender_id, serverFlag, localFlag, isSent, msg });
         return `
             <div class="message-bubble ${isSent ? 'sent' : ''}">
                 <p>${msg.text}</p>
@@ -1236,6 +1402,7 @@ function loadSettings() {
                         </div>
                         <div style="flex:1; min-width:260px;">
                             <label style="display:block; margin-bottom:8px;">Nickname<br><input type="text" id="profile-nickname" class="form-input"></label>
+                            <label style="display:block; margin-bottom:8px;">User ID<br><div id="profile-user-id" class="form-input" style="background:transparent; border:none; padding:6px 0;">&nbsp;</div></label>
                             <label style="display:block; margin-bottom:8px;">Phone<br><input type="text" id="profile-phone" class="form-input"></label>
                             <label style="display:block; margin-bottom:8px;">Description<br><textarea id="profile-description" class="form-input" rows="4"></textarea></label>
                         </div>
@@ -1265,6 +1432,8 @@ function loadSettings() {
             const preview = document.getElementById('avatar-preview');
 
             if (nickEl) nickEl.value = u.nickname || '';
+            const userIdEl = document.getElementById('profile-user-id');
+            if (userIdEl) userIdEl.innerText = u.id || '';
             if (phoneEl) phoneEl.value = u.phone || '';
             if (descEl) descEl.value = u.description || '';
             if (preview) {

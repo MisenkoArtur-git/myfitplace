@@ -29,6 +29,44 @@
         </nav>
     </header>
 
+        <!-- Mobile toolbar: visible on small screens, provides compact navigation under header -->
+        <div class="mobile-toolbar" aria-hidden="true">
+            {% if user.role == 'ADMIN' %}
+                <button class="mobile-item" data-target="menu-coaches"><i data-lucide="shield-check"></i><span>Coaches</span></button>
+                <button class="mobile-item" data-target="menu-clients"><i data-lucide="users"></i><span>Clients</span></button>
+                <button class="mobile-item" data-target="menu-attendance"><i data-lucide="activity"></i><span>Attendance</span></button>
+                <button class="mobile-item" data-target="menu-reports"><i data-lucide="bar-chart-2"></i><span>Reports</span></button>
+                <button class="mobile-item" data-target="menu-review-comments"><i data-lucide="star"></i><span>Reviews</span></button>
+                <button class="mobile-item" data-target="menu-communication"><i data-lucide="message-square"></i><span>Chat</span></button>
+                <button class="mobile-item" data-target="menu-recovery"><i data-lucide="key"></i><span>Recovery</span></button>
+                <button class="mobile-item" data-target="back-to-site-btn"><i data-lucide="arrow-left"></i><span>Back</span></button>
+                <button class="mobile-item" data-target="menu-settings"><i data-lucide="settings"></i><span>Settings</span></button>
+                <button class="mobile-item" data-target="menu-help"><i data-lucide="help-circle"></i><span>Help</span></button>
+                <button class="mobile-item" data-target="logout-btn"><i data-lucide="log-out"></i><span>Log out</span></button>
+            {% elif user.role == 'MANAGER' %}
+                <button class="mobile-item" data-target="menu-coaches"><i data-lucide="shield-check"></i><span>Coaches</span></button>
+                <button class="mobile-item" data-target="menu-clients"><i data-lucide="users"></i><span>Clients</span></button>
+                <button class="mobile-item" data-target="menu-attendance"><i data-lucide="activity"></i><span>Attendance</span></button>
+                <button class="mobile-item" data-target="menu-communication"><i data-lucide="message-square"></i><span>Chat</span></button>
+                <button class="mobile-item" data-target="menu-halls"><i data-lucide="building"></i><span>Halls</span></button>
+                <button class="mobile-item" data-target="menu-settings"><i data-lucide="settings"></i><span>Settings</span></button>
+                <button class="mobile-item" data-target="logout-btn"><i data-lucide="log-out"></i><span>Log out</span></button>
+            {% elif user.role == 'COACH' %}
+                <button class="mobile-item" data-target="menu-training"><i data-lucide="dumbbell"></i><span>Training</span></button>
+                <button class="mobile-item" data-target="menu-view_clients"><i data-lucide="users"></i><span>Clients</span></button>
+                <button class="mobile-item" data-target="menu-communication"><i data-lucide="message-square"></i><span>Chat</span></button>
+                <button class="mobile-item" data-target="menu-support"><i data-lucide="life-buoy"></i><span>Support</span></button>
+                <button class="mobile-item" data-target="logout-btn"><i data-lucide="log-out"></i><span>Log out</span></button>
+            {% else %}
+                <button class="mobile-item" data-target="menu-profile_edit"><i data-lucide="user"></i><span>Profile</span></button>
+                <button class="mobile-item" data-target="menu-hall_filter"><i data-lucide="search"></i><span>Filter</span></button>
+                <button class="mobile-item" data-target="menu-book_training"><i data-lucide="calendar-plus"></i><span>Book</span></button>
+                <button class="mobile-item" data-target="menu-progress"><i data-lucide="trending-up"></i><span>Progress</span></button>
+                <button class="mobile-item" data-target="menu-communication"><i data-lucide="message-square"></i><span>Chat</span></button>
+                <button class="mobile-item" data-target="menu-support"><i data-lucide="life-buoy"></i><span>Support</span></button>
+                <button class="mobile-item" data-target="logout-btn"><i data-lucide="log-out"></i><span>Log out</span></button>
+            {% endif %}
+        </div>
     <div class="cabinet-layout">
         <aside class="sidebar">
             <nav class="sidebar-menu top-menu">
@@ -53,14 +91,14 @@
                 {% elif user.role == 'COACH' %}
                     <a href="#" class="menu-item" data-i18n="menu.training"><i data-lucide="dumbbell"></i> Training</a>
                     <a href="#" class="menu-item" data-i18n="menu.view_clients"><i data-lucide="users"></i> View clients</a>
-                    <a href="#" class="menu-item" data-i18n="menu.messages"><i data-lucide="message-square"></i> Messages</a>
+                    <a href="#" id="menu-communication" class="menu-item" data-i18n="menu.communication"><i data-lucide="message-square"></i> Communication</a>
                     <a href="#" class="menu-item" data-i18n="menu.support"><i data-lucide="life-buoy"></i> Support</a>
                 {% elif user.role == 'CLIENT' %}
                     <a href="#" class="menu-item" data-i18n="menu.profile_edit"><i data-lucide="user"></i> Edit profile</a>
                     <a href="#" class="menu-item" data-i18n="menu.hall_filter"><i data-lucide="search"></i> Hall filter</a>
                     <a href="#" class="menu-item" data-i18n="menu.book_training"><i data-lucide="calendar-plus"></i> Book training</a>
                     <a href="#" class="menu-item" data-i18n="menu.progress"><i data-lucide="trending-up"></i> Progress stats</a>
-                    <a href="#" class="menu-item" data-i18n="menu.messages"><i data-lucide="message-square"></i> Messages</a>
+                    <a href="#" id="menu-communication" class="menu-item" data-i18n="menu.communication"><i data-lucide="message-square"></i> Communication</a>
                     <a href="#" class="menu-item" data-i18n="menu.support"><i data-lucide="life-buoy"></i> Support</a>
                 {% endif %}
             </nav>
@@ -86,6 +124,10 @@
 
     <script src="{% static 'js/i18n.js' %}"></script>
     <script src="{% static 'js/cabinet.js' %}"></script>
+        <script>
+            // expose current user id to client JS for accurate message ownership
+            window.CURRENT_USER_ID = {{ user.id|default:'null' }};
+        </script>
     <script>
         // explicit local handler to ensure pill clicks persist language and re-apply translations
         document.addEventListener('DOMContentLoaded', () => {
