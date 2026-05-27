@@ -216,6 +216,10 @@
     <div id="site-notification" aria-live="polite"></div>
 
     <script src="{% static 'js/i18n.js' %}"></script>
+    <!-- Expose auth state to client scripts -->
+    <script>
+        window.IS_AUTH = {% if user.is_authenticated %}true{% else %}false{% endif %};
+    </script>
     <script src="{% static 'js/auth.js' %}"></script>
     <script>lucide.createIcons();</script>
 </body>
