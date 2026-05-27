@@ -733,6 +733,10 @@ function openClientModal(mode, client = {}) {
 
     const canEdit = mode === 'edit';
     const fullName = client.nickname || '';
+    const nameParts = (fullName || '').split(' ');
+    const lastName = nameParts[0] || '';
+    const firstName = nameParts[1] || '';
+    const middleName = nameParts.slice(2).join(' ');
 
     modal.innerHTML = `
         <div class="modal-content">
@@ -747,11 +751,11 @@ function openClientModal(mode, client = {}) {
                         <input id="client-photo-input" name="photo" type="file" accept="image/*">
                     </label>
                     <img id="client-photo-preview" class="photo-preview" src="${client.photo_url || BASE_FOTO}" alt="Photo preview">
-                    <input id="client-last-name" name="last_name" type="text" placeholder="Last name" value="${client.last_name || ''}">
+                    <input id="client-last-name" name="last_name" type="text" placeholder="Last name" value="${lastName}">
                     <div class="field-error" id="client-last-name-error"></div>
-                    <input id="client-first-name" name="first_name" type="text" placeholder="First name" value="${client.first_name || ''}">
+                    <input id="client-first-name" name="first_name" type="text" placeholder="First name" value="${firstName}">
                     <div class="field-error" id="client-first-name-error"></div>
-                    <input id="client-middle-name" name="middle_name" type="text" placeholder="Middle name" value="${client.middle_name || ''}">
+                    <input id="client-middle-name" name="middle_name" type="text" placeholder="Middle name" value="${middleName}">
                     <div class="field-error" id="client-middle-name-error"></div>
                     
                 </div>
