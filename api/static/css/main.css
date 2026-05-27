@@ -45,7 +45,8 @@
 .password-field input { padding-right: 12px; }
 
 /* Toast notification styles */
-#site-notification { pointer-events: none; position: fixed; left: 0; right: 0; top: calc(var(--header-height) + 10px); display: flex; justify-content: center; z-index: 2000; }
+/* Increase z-index so toast appears above mobile toolbar/header on small screens */
+#site-notification { pointer-events: none; position: fixed; left: 0; right: 0; top: calc(var(--header-height) + 10px); display: flex; justify-content: center; z-index: 11003; }
 .site-toast {
     pointer-events: auto;
     width: auto;

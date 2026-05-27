@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (mt > 0) mt = mt + 18; // extra 18px padding
             }
         } catch (e) { mt = 0; }
-
+        
         // Protect against transient / overscroll-driven huge toolbar heights
         try {
             const maxMobileToolbar = Math.max(48, Math.round(window.innerHeight * 0.2));
@@ -640,5 +640,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     loadComments();
+
+    // Intercept public links to the cabinet and show a top red error when user is not authenticated
+    try {
+        document.querySelectorAll('a[href^="/cabinet/"]').forEach(link => {
+            link.addEventListener('click', (e) => {
+                if (window.IS_AUTH === false) {
+                    e.preventDefault();
+                    showNotification('error', 'Нельзя войти в кабинет не залогинившись.');
+                }
+            });
+        });
+    } catch (e) { /* ignore */ }
+
+    // Also use delegated listener to catch clicks on elements inside links or dynamically added links
+    try {
+        document.addEventListener('click', (e) => {
+            if (window.IS_AUTH !== false) return; // only intercept for anonymous users
+            const a = e.target.closest && e.target.closest('a[href]');
+            if (!a) return;
+            const href = a.getAttribute('href') || '';
+            // normalize and check path
+            try {
+                const url = new URL(href, window.location.href);
+                if (url.pathname === '/cabinet/' || url.pathname.startsWith('/cabinet/')) {
+                    e.preventDefault();
+                    showNotification('error', 'Нельзя войти в кабинет не залогинившись.');
+                }
+            } catch (err) {
+                // if href is not a valid URL, do a simple startsWith check
+                if (href.startsWith('/cabinet/')) {
+                    e.preventDefault();
+                    showNotification('error', 'Нельзя войти в кабинет не залогинившись.');
+                }
+            }
+        }, { capture: true });
+    } catch (e) { /* ignore */ }
 });
 
