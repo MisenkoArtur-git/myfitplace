@@ -31,15 +31,14 @@
 
 /* Новые правила для главной панели (на основе фото 1) */
 .main-header .nav-group > a,
-.main-header .nav-group > .btn-login,
-.main-header .nav-group > .btn-white-lg {
+.main-header .nav-group > .btn-login {
     display: inline-flex !important;
 }
 
 
 /* Reserve space for fixed header so main content doesn't jump under it
     The actual value is set dynamically via --header-height by JS. */
-main { padding-top: var(--header-height, 70px); }
+.main { padding-top: var(--header-height, 70px); }
 
 .logo-group { 
     display: flex; 
@@ -54,6 +53,12 @@ main { padding-top: var(--header-height, 70px); }
     align-items: center !important; 
     gap: 20px !important; 
 }
+
+/* Header language pills (desktop). Hidden on small screens to avoid duplication with mobile toolbar */
+.header-lang-switch { display: flex; gap: 8px; align-items: center; }
+
+/* keep header height dynamic (JS sets --header-height) */
+.main-header { min-height: var(--header-height, 70px); box-sizing: border-box; }
 
 /* Header language pills (desktop). Hidden on small screens to avoid duplication with mobile toolbar */
 .header-lang-switch { display: flex; gap: 8px; align-items: center; }
@@ -464,9 +469,11 @@ textarea#comment-text {
 
     /* На мобильных показываем ссылки и кнопки как обычные элементы (нет бургера) */
     .nav-group > a,
-    .nav-group > .btn-login,
-    .nav-group > .btn-white-lg {
+    .nav-group > .btn-login {
         display: inline-flex !important;
+    }
+    .nav-group > .btn-white-lg {
+        display: none !important;
     }
 
     /* Скрываем мобильный toggle — мы хотим поведение "как раньше" (без меню) */
@@ -954,7 +961,7 @@ textarea#comment-text {
         position: fixed;
         left: 0;
         right: 0;
-        top: calc(var(--header-height, 70px));
+        top: 70px;
         z-index: 10001;
         box-shadow: 0 6px 18px rgba(0,0,0,0.08);
     }
@@ -980,7 +987,7 @@ textarea#comment-text {
     .mobile-toolbar .lang-pill { padding:6px 8px; border-radius:999px; background:rgba(0,0,0,0.06); color:#111; border:none; cursor:pointer; }
     /* Reserve space for header + toolbar so content isn't hidden under them */
     /* Uses dynamic --mobile-toolbar-height set by JS (fallback 72px) */
-    main { padding-top: calc(var(--header-height,70px) + var(--mobile-toolbar-height,90px)); }
+    main { padding-top: calc(70px + var(--mobile-toolbar-height,90px)) !important; }
 }
 
 /* Header language pills (desktop) - visible by default */
@@ -988,8 +995,12 @@ textarea#comment-text {
 
 /* On small screens hide header link duplicates and show mobile toolbar instead */
 @media (max-width: 700px) {
-    .main-header .nav-group > a, .main-header .nav-group > .btn-login, .main-header .nav-group > .btn-white-lg { display: none !important; }
+    .main-header .nav-group > a, .main-header .nav-group > .btn-login { display: none !important; }
+    /* Show the join CTA in header on small screens (mobile) */
+    .main-header .nav-group > .btn-white-lg { display: inline-flex !important; }
     .header-lang-switch { display: none !important; }
+    /* On small screens allow nav items to wrap so pills/menu can stack */
+    .nav-group { flex-wrap: wrap !important; }
 }
 
 /* Ensure mobile toolbar is hidden on desktop */

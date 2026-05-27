@@ -1323,4 +1323,87 @@ body {
 }
 
 /* Ensure mobile toolbar is visible and usable */
+/* Ensure mobile toolbar is visible and usable */
+/* Ensure mobile toolbar is hidden on desktop */
+@media (min-width: 701px) {
+    .mobile-toolbar { display: none !important; }
+}
+
+/* ======= TEMPORARY OVERRIDES: force consistent header positioning =======
+   These rules are intentionally specific to defeat scattered conflicts
+   until CSS is cleaned up. Mobile toolbar display is applied only on
+   small screens to avoid showing mobile buttons on desktop. */
+:root { --header-height: 70px; }
+.main-header {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    transform: none !important;
+    will-change: auto !important;
+    z-index: 10000 !important;
+}
+@media (max-width: 700px) {
+    .mobile-toolbar {
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        top: calc(var(--header-height, 70px)) !important;
+        display: flex !important;
+        transform: none !important;
+        z-index: 10001 !important;
+    }
+}
+/* Ensure page content reserves space for header + optional toolbar */
+main, .main, .cabinet-layout {
+    padding-top: calc(var(--header-height, 70px) + var(--mobile-toolbar-height, 0px)) !important;
+    margin-top: 0 !important;
+}
+/* Sidebar top is set only where sidebar is fixed (desktop) via .cabinet-page rules */
+/* Prevent duplicated menu-open offsets from pushing content */
+.main-header.menu-open .nav-group {
+    top: calc(var(--header-height, 70px)) !important;
+}
+/* End overrides */
+
+/* Cabinet-page scoped normalization: only affects pages with <body class="cabinet-page"> */
+/* Use body padding-top as the single source of truth for header offset. */
+.cabinet-page {
+    /* Desktop/tablet: reserve only header height by default */
+    padding-top: calc(var(--header-height, 70px)) !important;
+}
+
+@media (max-width: 700px) {
+    .cabinet-page {
+        /* On small screens also reserve space for the mobile toolbar */
+        padding-top: calc(var(--header-height, 70px) + var(--mobile-toolbar-height, 90px)) !important;
+    }
+}
+
+/* Ensure cabinet layout and content area do not add extra top offset */
+.cabinet-page main, .cabinet-page .main, .cabinet-page .cabinet-layout, .cabinet-page .content-area {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+@media (min-width: 1201px) {
+    .cabinet-page .sidebar {
+        position: fixed !important;
+        top: var(--header-height) !important;
+        left: 0 !important;
+        bottom: 0 !important;
+        width: 220px !important;
+    }
+    .cabinet-page .content-area { margin-left: 220px !important; }
+}
+
+@media (max-width: 1200px) {
+    .cabinet-page .sidebar { position: relative !important; top: auto !important; width: 240px !important; }
+    .cabinet-page .content-area { margin-left: 0 !important; }
+}
+
+@media (max-width: 700px) {
+    .cabinet-page .sidebar { display: none !important; }
+    /* On mobile reserve space for header + toolbar on body (handled above). */
+}
 

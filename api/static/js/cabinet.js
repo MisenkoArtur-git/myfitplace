@@ -233,15 +233,30 @@ function initCabinet() {
         if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
     });
 
-    // ensure mobile toolbar is visible even if CSS has conflicts
+    // Ensure mobile toolbar is shown only on small viewports; otherwise hide it.
     try {
         const mt = document.querySelector('.mobile-toolbar');
-        if (mt) {
-            mt.style.display = mt.style.display || 'flex';
-            mt.setAttribute('aria-hidden', 'false');
-            mt.classList.remove('hidden');
+        function refreshMobileToolbar() {
+            if (!mt) return;
+                const w = window.innerWidth;
+                try { console.log('refreshMobileToolbar: window.innerWidth=', w); } catch(e){}
+                if (w <= 700) {
+                    try { console.log('refreshMobileToolbar: showing mobile toolbar'); } catch(e){}
+                    mt.style.display = 'flex';
+                    mt.setAttribute('aria-hidden', 'false');
+                    mt.classList.remove('hidden');
+                } else {
+                    try { console.log('refreshMobileToolbar: hiding mobile toolbar'); } catch(e){}
+                    mt.style.display = 'none';
+                    mt.setAttribute('aria-hidden', 'true');
+                    mt.classList.add('hidden');
+                }
+                // delegate height measurement to central updater so values stay consistent
+                try { if (window.scheduleUpdateHeaderHeight) { console.log('refreshMobileToolbar: requesting central header update'); window.scheduleUpdateHeaderHeight(); } } catch(e) { /* ignore */ }
         }
-    } catch (e) { console.warn('mobile-toolbar show failed', e); }
+        refreshMobileToolbar();
+        window.addEventListener('resize', refreshMobileToolbar);
+    } catch (e) { console.warn('mobile-toolbar toggle failed', e); }
 
     } catch (err) {
         console.error('initCabinet error', err && (err.message || err));

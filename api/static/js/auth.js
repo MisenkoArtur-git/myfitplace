@@ -58,6 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitLogin = document.getElementById('submit-login');
     const submitSignup = document.getElementById('submit-signup');
 
+    
+
     // 2. Логика модального окна
     if (openAuthBtn && modal) {
         openAuthBtn.addEventListener('click', (e) => { e.preventDefault(); modal.style.cssText = 'display: flex !important'; });
@@ -74,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
             mobileMenuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
             mobileMenuToggle.textContent = open ? 'Close' : 'Menu';
             // adjust main padding based on new header size when menu opens/closes
-            try { updateHeaderHeight(); } catch (e) {}
+            try { scheduleUpdateHeaderHeight(); } catch (e) {}
         });
     }
     // Floating FAB toggle: open/close vertical menu
@@ -84,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fabToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
             fabMenu.setAttribute('aria-hidden', open ? 'false' : 'true');
             // update header height after menu change
-            try { updateHeaderHeight(); } catch (e) {}
+            try { scheduleUpdateHeaderHeight(); } catch (e) {}
         });
         // close on outside click
         window.addEventListener('click', (e) => {
@@ -93,19 +95,24 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.classList.remove('fab-open');
             fabToggle.setAttribute('aria-expanded', 'false');
             fabMenu.setAttribute('aria-hidden', 'true');
-            try { updateHeaderHeight(); } catch (e) {}
+            try { scheduleUpdateHeaderHeight(); } catch (e) {}
         });
         // close on Escape
-        window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { document.body.classList.remove('fab-open'); fabToggle.setAttribute('aria-expanded', 'false'); fabMenu.setAttribute('aria-hidden', 'true'); try { updateHeaderHeight(); } catch (err) {} } });
+        window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { document.body.classList.remove('fab-open'); fabToggle.setAttribute('aria-expanded', 'false'); fabMenu.setAttribute('aria-hidden', 'true'); try { scheduleUpdateHeaderHeight(); } catch (err) {} } });
     }
 
     // Dynamically compute header height and set CSS variable so main content
     // is always positioned below the fixed header (prevents header overlapping hero)
+    let _prevHeaderHeight = 0;
+    let _prevMobileToolbarHeight = 0;
+    // Enable verbose debug logs for header measurements (set window.__HEADER_DEBUG = true to enable)
+    const __HEADER_DEBUG = (typeof window.__HEADER_DEBUG !== 'undefined') ? !!window.__HEADER_DEBUG : false;
     function updateHeaderHeight() {
+        if (__HEADER_DEBUG) console.log('updateHeaderHeight: start');
         const header = document.querySelector('.main-header');
         if (!header) return;
         const rect = header.getBoundingClientRect();
-        const h = Math.ceil(rect.height);
+        let h = Math.ceil(rect.height);
         // Also measure mobile toolbar height (if visible) and expose as CSS variable
         let mt = 0;
         try {
@@ -119,12 +126,62 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) { mt = 0; }
 
+        // Protect against transient / overscroll-driven huge toolbar heights
+        try {
+            const maxMobileToolbar = Math.max(48, Math.round(window.innerHeight * 0.2));
+            if (mt > maxMobileToolbar) {
+                if (__HEADER_DEBUG) console.warn('updateHeaderHeight: measured mobile-toolbar mt=', mt, 'exceeds maxMobileToolbar=', maxMobileToolbar, '- clamping to max');
+                // Clamp to a reasonable maximum to avoid transient overscroll spikes
+                mt = Math.min(mt, maxMobileToolbar);
+            }
+        } catch (e) {}
+
+        // avoid reacting to transient/overscroll values: ignore absurdly large heights
+        try {
+            const maxReasonable = Math.max(70, Math.round(window.innerHeight * 0.5));
+            if (h > maxReasonable) {
+                if (__HEADER_DEBUG) console.warn('updateHeaderHeight: measured header height', h, 'exceeds maxReasonable', maxReasonable, '- clamping to maxReasonable');
+                // Clamp to a reasonable maximum to avoid transient overscroll spikes
+                h = Math.min(h, maxReasonable);
+            }
+        } catch (e) {}
+
+        // Hysteresis: only update CSS variables when values changed meaningfully
+        // increase hysteresis threshold slightly to avoid rapid tiny updates
+        if (Math.abs(h - _prevHeaderHeight) < 6 && Math.abs(mt - _prevMobileToolbarHeight) < 6) {
+            if (__HEADER_DEBUG) console.log('updateHeaderHeight: skipped (within hysteresis). measured h=', h, 'mt=', mt, 'prev h=', _prevHeaderHeight, 'prev mt=', _prevMobileToolbarHeight);
+            return;
+        }
+
+        if (__HEADER_DEBUG) console.log('updateHeaderHeight: applying update. h=', h, 'mt=', mt, 'prev h=', _prevHeaderHeight, 'prev mt=', _prevMobileToolbarHeight);
+
         document.documentElement.style.setProperty('--header-height', h + 'px');
         document.documentElement.style.setProperty('--mobile-toolbar-height', mt + 'px');
+
+        _prevHeaderHeight = h;
+        _prevMobileToolbarHeight = mt;
     }
-    // Call on load and when window resizes
-    try { updateHeaderHeight(); } catch (e) {}
-    window.addEventListener('resize', () => { try { updateHeaderHeight(); } catch (e) {} });
+    // rAF-debounced runner to avoid repeated synchronous layout reads/writes
+    let _headerTicking = false;
+    function scheduleUpdateHeaderHeight() {
+        if (__HEADER_DEBUG) console.log('scheduleUpdateHeaderHeight: requested');
+        if (_headerTicking) {
+            if (__HEADER_DEBUG) console.log('scheduleUpdateHeaderHeight: already scheduled, ignoring');
+            return;
+        }
+        _headerTicking = true;
+        window.requestAnimationFrame(() => {
+            try { updateHeaderHeight(); } catch (e) {}
+            _headerTicking = false;
+        });
+    }
+
+    // expose debounced updater so other modules can request a measurement
+    try { window.scheduleUpdateHeaderHeight = scheduleUpdateHeaderHeight; } catch (e) {}
+
+    // Call on load and when window resizes (debounced via rAF)
+    try { scheduleUpdateHeaderHeight(); } catch (e) {}
+    window.addEventListener('resize', () => { try { scheduleUpdateHeaderHeight(); } catch (e) {} });
     if (closeBtn && modal) {
         closeBtn.addEventListener('click', () => { modal.style.cssText = 'display: none !important'; });
     }
