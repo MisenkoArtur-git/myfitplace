@@ -19,6 +19,13 @@
                 el.setAttribute('placeholder', text);
                 return;
             }
+            // If the element contains a dedicated `.menu-text` child, update it
+            const menuTextEl = el.querySelector('.menu-text');
+            if (menuTextEl) {
+                menuTextEl.innerText = text;
+                return;
+            }
+
             // preserve icon elements (e.g., <i data-lucide>) when setting text
             const icon = el.querySelector('i[data-lucide], svg');
             if (icon) {

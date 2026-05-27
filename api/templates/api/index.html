@@ -4,33 +4,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{% static 'favicon.ico' %}">
     <title>MyFit.Place</title>
     <link rel="stylesheet" href="{% static 'css/index.css' %}">
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
-
     <header class="main-header">
         <div class="logo-group">
             <span>MyFit.Place</span>
             <i data-lucide="dumbbell" class="icon-logo"></i>
         </div>
         <nav class="nav-group">
-            <a href="#" data-i18n="nav.about">About us</a>
-            <a href="#" data-i18n="nav.home">Home</a>
-            <div class="lang-switch" id="lang-switch" style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+            <a href="/" data-i18n="nav.home"><div class="nav-item"><span class="nav-text">Home</span></div></a>
+            <a href="/about/" data-i18n="nav.about"><div class="nav-item"><span class="nav-text">About us</span></div></a>
+            <div class="lang-switch header-lang-switch" id="lang-switch" style="cursor:pointer; display:flex; align-items:center; gap:8px;">
                 <div class="lang-pill" data-lang="en">EN</div>
                 <div class="lang-pill" data-lang="uk">UA</div>
             </div>
             {% if user.is_authenticated %}
-                <a href="/cabinet/" class="btn btn-login" data-i18n="nav.cabinet">Cabinet</a>
-                <a href="{% url 'logout' %}" id="logout-btn" class="btn btn-login" data-i18n="nav.logout">Logout</a>
+                <a href="/cabinet/" class="btn btn-login" data-i18n="nav.cabinet"><div class="nav-item"><span class="nav-text">Cabinet</span></div></a>
+                <a href="{% url 'logout' %}" id="logout-btn" class="btn btn-login" data-i18n="nav.logout"><div class="nav-item"><span class="nav-text">Logout</span></div></a>
             {% else %}
                 <button class="btn btn-login" id="open-auth-btn" data-i18n="nav.login">Login/Sign Up</button>
+                <button class="btn btn-white-lg" id="mobile-cta-join" onclick="document.getElementById('cta-join-btn')?.scrollIntoView({behavior:'smooth'})">Join</button>
             {% endif %}
+            
         </nav>
     </header>
+    <!-- Mobile toolbar for public site (visible on small screens) -->
+    <div class="mobile-toolbar" aria-hidden="true">
+        <a class="mobile-item" href="/"><i data-lucide="home"></i><span>Home</span></a>
+        <a class="mobile-item" href="/about/"><i data-lucide="info"></i><span>About</span></a>
+        
+        {% if user.is_authenticated %}
+            <a class="mobile-item" href="/cabinet/"><i data-lucide="user"></i><span>Cabinet</span></a>
+            <a class="mobile-item" href="{% url 'logout' %}"><i data-lucide="log-out"></i><span>Logout</span></a>
+        {% else %}
+            <a class="mobile-item" href="/cabinet/"><i data-lucide="user"></i><span>Cabinet</span></a>
+            <button class="mobile-item" onclick="document.getElementById('open-auth-btn')?.click();"><i data-lucide="log-in"></i><span>Login</span></button>
+        {% endif %}
+    </div>
 
     <main>
         <section class="hero-block">
@@ -73,14 +88,7 @@
                                 <span class="star" data-value="4">★</span>
                                 <span class="star" data-value="5">★</span>
                             </div>
-                            <!-- Radio-style controls under stars -->
-                            <div class="rating-radios" style="display:flex; gap:18px; justify-content:center; margin-bottom:12px;">
-                                <label class="radio-label"><input type="radio" name="rating-full" value="1"><span class="radio-dot"></span></label>
-                                <label class="radio-label"><input type="radio" name="rating-full" value="2"><span class="radio-dot"></span></label>
-                                <label class="radio-label"><input type="radio" name="rating-full" value="3"><span class="radio-dot"></span></label>
-                                <label class="radio-label"><input type="radio" name="rating-full" value="4"><span class="radio-dot"></span></label>
-                                <label class="radio-label"><input type="radio" name="rating-full" value="5" checked><span class="radio-dot"></span></label>
-                            </div>
+                            <!-- Radios removed: only stars remain as the rating control -->
                             <input type="hidden" id="comment-rating-full" value="5">
                             <textarea id="comment-text-full" class="comment-input-large" placeholder="Write your review..."></textarea>
                             <button id="submit-comment-full" class="btn btn-submit" data-auth="{% if user.is_authenticated %}1{% else %}0{% endif %}" data-i18n="comments.send">Send</button>

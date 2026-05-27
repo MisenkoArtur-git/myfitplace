@@ -23,6 +23,24 @@
     background-color: var(--green); 
 }
 
+/* Keep header fixed on all viewports so it doesn't scroll with content */
+.main-header { position: fixed !important; top: 0; left: 0; right: 0; z-index: 10000; }
+
+/* Mobile menu toggle (hidden by default, shown only on small screens) */
+.mobile-menu-toggle { display: none; }
+
+/* Новые правила для главной панели (на основе фото 1) */
+.main-header .nav-group > a,
+.main-header .nav-group > .btn-login,
+.main-header .nav-group > .btn-white-lg {
+    display: inline-flex !important;
+}
+
+
+/* Reserve space for fixed header so main content doesn't jump under it
+    The actual value is set dynamically via --header-height by JS. */
+main { padding-top: var(--header-height, 70px); }
+
 .logo-group { 
     display: flex; 
     align-items: center; 
@@ -36,6 +54,9 @@
     align-items: center !important; 
     gap: 20px !important; 
 }
+
+/* Header language pills (desktop). Hidden on small screens to avoid duplication with mobile toolbar */
+.header-lang-switch { display: flex; gap: 8px; align-items: center; }
 
 .nav-group a, .nav-group button { 
     color: var(--white) !important; 
@@ -101,45 +122,48 @@
 
 .comments-col { display: none; }
 /* Hero sections */
-.hero-block { 
-    display: flex; 
-    width: 100%; 
-    height: 450px; 
+.hero-block {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    min-height: 420px; /* allow content to grow on smaller screens */
+    align-items: stretch;
 }
 
-.text-side { 
-    width: 50%; 
-    display: flex; 
-    flex-direction: column; 
-    justify-content: center; 
-    padding: 60px; 
-    background-color: var(--light-grey); 
+.text-side {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(20px, 4vw, 60px);
+    background-color: var(--light-grey);
+    box-sizing: border-box;
+    overflow: hidden;
+    word-wrap: break-word;
+    hyphens: auto;
 }
 
-.img-side { 
-    width: 50%; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    background-color: #f0f0f0; 
-    overflow: hidden; 
+.img-side {
+    display: block;
+    min-height: 0;
+    background-color: #f0f0f0;
+    overflow: hidden;
 }
 
-.img-side img { 
-    width: 100%; 
-    height: 100%; 
-    object-fit: cover; 
-    object-position: center center; 
-    flex-shrink: 0; 
-    display: block; 
+.img-side img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+    display: block;
 }
 
-.title-large { 
-    font-size: 2.8rem; 
-    font-weight: 900; 
-    text-transform: uppercase; 
-    margin-bottom: 20px; 
-    line-height: 1.1; 
+.title-large {
+    font-size: clamp(1.6rem, 4.2vw, 3.2rem);
+    font-weight: 900;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    line-height: 1.05;
+    word-break: break-word;
 }
 
 .text-green { 
@@ -406,6 +430,115 @@ textarea#comment-text {
     color: #222;
 }
 
+/* --- НОВАЯ СТИЛИЗАЦИЯ МОБИЛЬНОГО МЕНЮ (ПО ФОТО 2) --- */
+@media (max-width: 700px) {
+    /* Фиксированная аккуратная шапка в одну строку */
+    .main-header {
+        padding: 12px 20px !important;
+        display: flex !important;
+        flex-direction: row !important; /* Строго в линию, а не в колонку */
+        justify-content: space-between !important;
+        align-items: center !important;
+        position: fixed !important;
+        height: 70px !important;
+    }
+
+    /* Логотип слева остается компактным */
+    .logo-group {
+        width: auto !important;
+        font-size: 1.3rem !important;
+        margin-bottom: 0 !important;
+        justify-content: flex-start !important;
+    }
+
+    /* Панель навигации — показываем ссылки и кнопки как в десктоп версии (без скрывающего меню) */
+    .nav-group {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 12px !important;
+        padding-top: 0 !important;
+        width: auto !important;
+        flex-wrap: wrap !important;
+    }
+
+    /* На мобильных показываем ссылки и кнопки как обычные элементы (нет бургера) */
+    .nav-group > a,
+    .nav-group > .btn-login,
+    .nav-group > .btn-white-lg {
+        display: inline-flex !important;
+    }
+
+    /* Скрываем мобильный toggle — мы хотим поведение "как раньше" (без меню) */
+    .mobile-menu-toggle { display: none !important; }
+
+    /* Переключатель языков всегда виден в шапке рядом с кнопкой Menu */
+    .nav-group > .lang-switch {
+        display: flex !important;
+    }
+
+    /* Раскрывающееся меню: когда у .main-header появляется класс .menu-open */
+    .main-header.menu-open {
+        background-color: var(--green) !important;
+    }
+
+    .main-header.menu-open .nav-group {
+        position: absolute !important;
+        left: 0 !important;
+        right: 0 !important;
+        top: 70px !important; /* Открывается ровно под шапкой */
+        background: var(--dark-green) !important; /* Чуть темнее для контраста выпадающего списка */
+        flex-direction: column !important;
+        gap: 12px !important;
+        padding: 20px 0 !important;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+        width: 100% !important;
+        z-index: 9999 !important;
+    }
+
+    /* Показываем ссылки внутри раскрытого меню */
+    .main-header.menu-open .nav-group > a,
+    .main-header.menu-open .nav-group > .btn-login,
+    .main-header.menu-open .nav-group > .btn-white-lg {
+        display: inline-flex !important;
+    }
+
+    /* Красивые скругленные пункты меню в виде пилюль */
+    .main-header.menu-open .nav-group a,
+    .main-header.menu-open .nav-group button:not(.lang-pill) {
+        justify-content: center !important;
+        align-items: center !important;
+        width: 86% !important;
+        max-width: 280px !important;
+        padding: 10px 16px !important;
+        border-radius: 999px !important;
+        background: rgba(255, 255, 255, 0.1) !important;
+        color: #fff !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        font-weight: 700 !important;
+    }
+
+    .main-header.menu-open .nav-group .btn-white-lg {
+        background: #fff !important;
+        color: var(--dark) !important;
+        border: none !important;
+    }
+
+    /* Отступ для контента страницы под фиксированную шапку */
+    main {
+        padding-top: 70px !important;
+    }
+
+    /* Отключение старого тулбара */
+    /* (removed display:none !important so cabinet main.css can show toolbar) */
+}
+
+/* On very narrow phones hide decorative image column to save space */
+@media (max-width: 360px) {
+    .img-side { display: none; }
+    .title-large { font-size: 1.6rem; }
+}
+
 .comment-note,
 .comment-login-note {
     font-size: 0.9rem;
@@ -499,12 +632,7 @@ textarea#comment-text {
     max-height: 220px;
 }
 
-/* Radio dot styles under stars */
-.rating-radios { margin-top: 4px; }
-.rating-radios .radio-label { display:inline-block; cursor:pointer; }
-.rating-radios input[type="radio"] { display: none; }
-.rating-radios .radio-dot { width: 14px; height: 14px; border-radius: 50%; display:inline-block; border: 2px solid #CFCFCF; transition: background 0.12s, border-color 0.12s; }
-.rating-radios input[type="radio"]:checked + .radio-dot { background: var(--dark-green); border-color: var(--dark-green); }
+/* Radio dots removed — stars alone indicate rating now */
 
 /* Make comments list appear as a vertical feed */
 .reviews-right .comments-list { display: flex; flex-direction: column; gap: 18px; padding: 12px; max-height: 520px; overflow-y: auto; }
@@ -813,4 +941,58 @@ textarea#comment-text {
         max-width: 100% !important;
         margin: 5px 0 !important;
     }
+
+    /* Mobile toolbar for public site */
+    .mobile-toolbar {
+        display: flex !important;
+        gap: 8px;
+        align-items: center;
+        overflow-x: auto;
+        padding: 8px 12px;
+        background: #FFFFFF;
+        border-bottom: 1px solid #E6E6E6;
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: calc(var(--header-height, 70px));
+        z-index: 10001;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    }
+
+    .mobile-toolbar .mobile-item {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-width: 64px;
+        padding: 6px 8px;
+        border-radius: 10px;
+        background: transparent;
+        border: none;
+        color: #2b2b2b;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none !important;
+    }
+    .mobile-toolbar .mobile-item i { display: block; }
+    .mobile-toolbar .mobile-item span { display: block; font-size: 0.8rem; }
+    .mobile-toolbar .lang-pill-mobile { display: inline-flex; gap:6px; align-items:center; }
+    .mobile-toolbar .lang-pill { padding:6px 8px; border-radius:999px; background:rgba(0,0,0,0.06); color:#111; border:none; cursor:pointer; }
+    /* Reserve space for header + toolbar so content isn't hidden under them */
+    /* Uses dynamic --mobile-toolbar-height set by JS (fallback 72px) */
+    main { padding-top: calc(var(--header-height,70px) + var(--mobile-toolbar-height,90px)); }
+}
+
+/* Header language pills (desktop) - visible by default */
+.header-lang-switch { display: flex; gap:8px; align-items:center; }
+
+/* On small screens hide header link duplicates and show mobile toolbar instead */
+@media (max-width: 700px) {
+    .main-header .nav-group > a, .main-header .nav-group > .btn-login, .main-header .nav-group > .btn-white-lg { display: none !important; }
+    .header-lang-switch { display: none !important; }
+}
+
+/* Ensure mobile toolbar is hidden on desktop */
+@media (min-width: 701px) {
+    .mobile-toolbar { display: none !important; }
 }

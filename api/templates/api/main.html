@@ -5,12 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token }}">
+    <link rel="icon" href="{% static 'favicon.ico' %}">
     <title>MyFit.Place - Dashboard</title>
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
-
     <header class="main-header">
         <div class="logo-group">
             <span>MyFit.Place</span>
@@ -19,7 +19,7 @@
         <nav class="nav-group">
             <a href="/" data-i18n="nav.home">Home</a>
             <a href="#" data-i18n="nav.about">About us</a>
-            <div class="lang-switch" id="lang-switch" style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+            <div class="lang-switch header-lang-switch" id="lang-switch" style="cursor:pointer; display:flex; align-items:center; gap:8px;">
                 <div class="lang-pill" data-lang="en">EN</div>
                 <div class="lang-pill" data-lang="uk">UA</div>
             </div>
@@ -71,13 +71,13 @@
         <aside class="sidebar">
             <nav class="sidebar-menu top-menu">
                 {% if user.role == 'ADMIN' %}
-                    <a href="#" id="menu-coaches" class="menu-item" data-i18n="menu.coaches"><i data-lucide="shield-check"></i> Manage coaches</a>
-                    <a href="#" id="menu-clients" class="menu-item" data-i18n="menu.clients"><i data-lucide="users"></i> Manage clients</a>
-                    <a href="#" id="menu-attendance" class="menu-item" data-i18n="menu.attendance"><i data-lucide="activity"></i> Attendance control</a>
-                    <a href="#" class="menu-item" data-i18n="menu.reports"><i data-lucide="bar-chart-2"></i> Reports</a>
-                    <a href="#" id="menu-review-comments" class="menu-item" data-i18n="menu.review_comments"><i data-lucide="star"></i> Review comments</a>
-                    <a href="#" id="menu-communication" class="menu-item" data-i18n="menu.communication"><i data-lucide="message-square"></i> Communication</a>
-                    <a href="#" class="menu-item" data-i18n="menu.recovery"><i data-lucide="key"></i> Recovery</a>
+                    <a href="#" id="menu-coaches" class="menu-item" data-i18n="menu.coaches"><div class="menu-inner"><i data-lucide="shield-check"></i><div class="menu-text">Manage coaches</div></div></a>
+                    <a href="#" id="menu-clients" class="menu-item" data-i18n="menu.clients"><div class="menu-inner"><i data-lucide="users"></i><div class="menu-text">Manage clients</div></div></a>
+                    <a href="#" id="menu-attendance" class="menu-item" data-i18n="menu.attendance"><div class="menu-inner"><i data-lucide="activity"></i><div class="menu-text">Attendance control</div></div></a>
+                    <a href="#" class="menu-item" data-i18n="menu.reports"><div class="menu-inner"><i data-lucide="bar-chart-2"></i><div class="menu-text">Reports</div></div></a>
+                    <a href="#" id="menu-review-comments" class="menu-item" data-i18n="menu.review_comments"><div class="menu-inner"><i data-lucide="star"></i><div class="menu-text">Review comments</div></div></a>
+                    <a href="#" id="menu-communication" class="menu-item" data-i18n="menu.communication"><div class="menu-inner"><i data-lucide="message-square"></i><div class="menu-text">Communication</div></div></a>
+                    <a href="#" class="menu-item" data-i18n="menu.recovery"><div class="menu-inner"><i data-lucide="key"></i><div class="menu-text">Recovery</div></div></a>
                 {% elif user.role == 'MANAGER' %}
                     <a href="#" id="menu-coaches" class="menu-item" data-i18n="menu.coaches"><i data-lucide="shield-check"></i> Manage coaches</a>
                     <a href="#" id="menu-clients" class="menu-item" data-i18n="menu.clients"><i data-lucide="users"></i> Manage clients</a>
@@ -105,10 +105,10 @@
 
             <nav class="sidebar-menu bottom-menu">
                 <hr class="menu-divider">
-                <a href="/" id="back-to-site-btn" class="menu-item" data-i18n="menu.back"> <i data-lucide="arrow-left"></i> Back to site</a>
-                <a href="#" id="menu-settings" class="menu-item" data-i18n="menu.settings"><i data-lucide="settings"></i> Settings</a>
-                <a href="#" class="menu-item" data-i18n="menu.help"><i data-lucide="help-circle"></i> Help</a>
-                <a href="{% url 'logout' %}" id="logout-btn" class="menu-item logout-link" data-i18n="menu.logout"><i data-lucide="log-out"></i> Log Out</a>
+                <a href="/" id="back-to-site-btn" class="menu-item" data-i18n="menu.back"><div class="menu-inner"><i data-lucide="arrow-left"></i><div class="menu-text">Back to site</div></div></a>
+                <a href="#" id="menu-settings" class="menu-item" data-i18n="menu.settings"><div class="menu-inner"><i data-lucide="settings"></i><div class="menu-text">Settings</div></div></a>
+                <a href="#" class="menu-item" data-i18n="menu.help"><div class="menu-inner"><i data-lucide="help-circle"></i><div class="menu-text">Help</div></div></a>
+                <a href="{% url 'logout' %}" id="logout-btn" class="menu-item logout-link" data-i18n="menu.logout"><div class="menu-inner"><i data-lucide="log-out"></i><div class="menu-text">Log Out</div></div></a>
             </nav>
         </aside>
 

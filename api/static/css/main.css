@@ -2,6 +2,8 @@
     --green: #71A866;
     --dark-green: #3B6B35;
     --grey: #E5E5E5;
+    --header-height: 70px;
+    --mobile-toolbar-height: 84px;
     --dark: #1A1A1A;
     --white: #FFFFFF;
 }
@@ -43,7 +45,7 @@
 .password-field input { padding-right: 12px; }
 
 /* Toast notification styles */
-#site-notification { pointer-events: none; position: fixed; left: 0; right: 0; top: 80px; display: flex; justify-content: center; z-index: 2000; }
+#site-notification { pointer-events: none; position: fixed; left: 0; right: 0; top: calc(var(--header-height) + 10px); display: flex; justify-content: center; z-index: 2000; }
 .site-toast {
     pointer-events: auto;
     width: auto;
@@ -95,16 +97,13 @@ body {
     top: 0;
     left: 0;
     right: 0;
-    z-index: 400;
-}
-
-/* Match the public site's main header styling so cabinet header looks identical */
-.main-header { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    padding: 20px 40px; 
-    background-color: var(--green); 
+    z-index: 11002;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--green);
+    height: var(--header-height);
+    padding: 0 30px;
 }
 
 .nav-group { 
@@ -112,6 +111,9 @@ body {
     align-items: center !important; 
     gap: 20px !important; 
 }
+
+/* Header language pills (desktop) - hidden on small screens */
+.header-lang-switch { display: flex; gap: 8px; align-items: center; }
 
 .nav-group a, .nav-group button { 
     color: var(--white) !important; 
@@ -168,12 +170,15 @@ body {
 .cabinet-layout { 
     display: flex; 
     flex-grow: 1; 
-    height: calc(100vh - 70px); 
-    margin-top: 70px; /* push content below fixed header */
+    height: calc(100vh - var(--header-height)); 
+    margin-top: var(--header-height); /* push content below fixed header */
 }
+
+/* Removed global left-padding override to preserve mobile layout; desktop overrides applied later */
 
 /* Sidebar */
 .sidebar { 
+    /* base responsive width; desktop-specific narrow style applied in media query */
     width: clamp(220px, 20vw, 340px);
     min-width: 220px;
     max-width: 360px;
@@ -184,6 +189,7 @@ body {
     flex-direction: column; 
     justify-content: space-between; 
     height: 100%; 
+    box-sizing: border-box;
 }
 
 .sidebar-menu { 
@@ -199,28 +205,60 @@ body {
 
 /* Menu items */
 .menu-item { 
-    display: flex; 
-    align-items: center; 
-    gap: 12px; 
-    padding: 12px 15px; 
+    display: block; 
     color: #444; 
     text-decoration: none; 
-    font-weight: bold; 
-    border-radius: 10px; 
-    transition: background 0.2s; 
-    white-space: normal; /* allow wrapping for long translations */
-    word-break: break-word;
+    font-weight: 700; 
+    transition: background 0.12s ease; 
 }
 
-.menu-item:hover { 
+.menu-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 8px;
+    border-radius: 8px;
+}
+
+.menu-inner i {
+    font-size: 20px; /* icon size */
+    color: #525252;
+}
+
+.menu-text {
+    font-size: 0.95rem;
+    line-height: 1.1;
+    color: #444;
+}
+
+.menu-item:hover .menu-inner { 
     background-color: #D6D6D6; 
-    color: var(--dark-green); 
 }
 
 /* Класс active, который добавляется через JS */
-.menu-item.active { 
-    background-color: #D6D6D6; 
-    color: var(--dark-green); 
+.menu-item.active .menu-inner { 
+    background-color: rgba(113,168,102,0.12);
+}
+.menu-item.active .menu-text {
+    color: var(--dark-green);
+}
+.menu-item.active .menu-inner i {
+    color: var(--dark-green);
+}
+
+/* Ensure inner blocks size correctly inside sidebar */
+.menu-inner { width: 100%; box-sizing: border-box; }
+.bottom-menu { padding-bottom: 18px; }
+
+/* Desktop-only: fix narrow left sidebar and header sizing without touching mobile rules */
+@media (min-width: 1201px) {
+    /* Make sidebar fixed on desktop so it always reaches bottom */
+    .sidebar { position: fixed; top: var(--header-height); left: 0; bottom: 0; width: 220px; min-width:220px; max-width:220px; padding: 28px 16px; box-sizing: border-box; padding-bottom: 60px; overflow-y: auto; }
+    .main-header { height: var(--header-height); padding: 18px 40px; }
+    .cabinet-layout { margin-top: var(--header-height); }
+    /* Push content area right so it doesn't sit under fixed sidebar */
+    .content-area { margin-left: 220px; }
 }
 
 .menu-divider { 
@@ -972,9 +1010,53 @@ body {
 }
 
 @media (max-width: 900px) {
-    .attendance-filters {
-        grid-template-columns: 1fr;
+    /* collapse header links on small screens */
+    .nav-group a { display: none; }
+    /* Ensure primary action buttons (cabinet/logout) remain accessible on mobile */
+    .nav-group a.btn-login, .nav-group button.btn-login { display: inline-flex !important; }
+
+    /* Mobile toolbar: fixed strip under header, horizontally scrollable */
+    .mobile-toolbar {
+        position: fixed;
+        top: calc(var(--header-height, 70px)); /* directly under header */
+        left: 0;
+        right: 0;
+        height: var(--mobile-toolbar-height);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        background: rgba(255,255,255,0.98);
+        box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+        z-index: 350;
     }
+    .mobile-toolbar .mobile-item {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        min-width: 64px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: transparent;
+        border: none;
+        color: #2b2b2b;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .mobile-toolbar .mobile-item i { display: block; }
+    .mobile-toolbar .mobile-item span { display: block; font-size: 0.8rem; }
+    .mobile-toolbar .mobile-item.active { background: var(--green); color: #fff; }
+
+    /* Reserve space for toolbar so content isn't hidden behind it */
+    .cabinet-layout { margin-top: calc(var(--header-height, 70px) + var(--mobile-toolbar-height)); }
+}
+
+@media (min-width: 701px) {
+    .mobile-toolbar { display: none !important; }
 }
 
 /* Responsive adjustments for communication and general layout */
@@ -1182,7 +1264,7 @@ body {
 
 /* Mobile toolbar styles */
 .mobile-toolbar {
-    display: none;
+    display: none; /* Mobile toolbar: default hidden on desktop; visible via media queries on small screens */
 }
 
 @media (max-width: 700px) {
@@ -1194,6 +1276,13 @@ body {
         padding: 10px 12px;
         background: #FFFFFF;
         border-bottom: 1px solid #E6E6E6;
+        /* Fixed under header so it is always visible and not hidden */
+        position: fixed !important;
+        left: 0;
+        right: 0;
+        top: calc(var(--header-height, 70px) + 8px);
+        z-index: 10001;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.08);
     }
 
     .mobile-item {
@@ -1209,6 +1298,7 @@ body {
         color: #333;
         cursor: pointer;
         font-size: 0.82rem;
+        pointer-events: auto; /* ensure touch events reach items */
     }
 
     .mobile-item span { display: block; margin-top: 6px; }
@@ -1219,9 +1309,16 @@ body {
         color: var(--dark-green);
     }
 
-    /* push workspace down a bit so toolbar doesn't overlap content */
+    /* Hide header language pills on small screens to avoid duplication */
+    .header-lang-switch { display: none !important; }
+
+    /* push workspace down a bit so toolbar doesn't avoid overlapping content */
     .cabinet-layout { margin-top: 0; }
-    .mobile-toolbar { position: sticky; top: 70px; z-index: 50; display: flex; }
+    /* Ensure toolbar doesn't overlap content — reserve space under header */
+    .mobile-toolbar { position: fixed; left: 0; right: 0; top: calc(var(--header-height, 70px)); z-index: 10001; display: flex; }
+    /* Reserve space for header + toolbar so main content is visible */
+    /* Use dynamic --mobile-toolbar-height set by JS (fallback 90px) */
+    .cabinet-layout { margin-top: calc(var(--header-height, 70px) + var(--mobile-toolbar-height,90px)); }
     .content-area { padding-top: 12px; }
 }
 

@@ -13,6 +13,7 @@ const BASE_FOTO = (window.location && window.location.origin ? window.location.o
 
 // debug: confirm script loaded
 try { console.log('cabinet.js: loaded'); } catch (e) {}
+try { console.log('cabinet.js: script present, ready to init'); } catch(e) {}
 
 // Robust fetch helper: returns parsed JSON or throws with clear message.
 async function fetchJson(url, opts) {
@@ -42,7 +43,10 @@ async function fetchJson(url, opts) {
 }
 
 function initCabinet() {
+    try {
+    console.log('cabinet.js: initCabinet start');
     const logoutBtn = document.getElementById('logout-btn');
+    console.log('cabinet.js: found logoutBtn?', !!logoutBtn);
     const backToSiteBtn = document.getElementById('back-to-site-btn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', (e) => {
@@ -59,6 +63,7 @@ function initCabinet() {
     }
 
     const menuItems = document.querySelectorAll('.sidebar .menu-item');
+    console.log('cabinet.js: menuItems count', menuItems.length);
     
     loadHalls();
 
@@ -135,17 +140,28 @@ function initCabinet() {
 
     // Mobile toolbar interaction: delegate clicks from mobile toolbar buttons
     const mobileToolbar = document.querySelector('.mobile-toolbar');
+    console.log('cabinet.js: mobileToolbar element?', !!mobileToolbar);
     if (mobileToolbar) {
-        mobileToolbar.addEventListener('click', (e) => {
-            const btn = e.target.closest('.mobile-item');
+        console.log('cabinet.js: attaching mobileToolbar handler');
+        const handleMobileAction = (evt) => {
+            // unify touch/pointer/click events
+            const e = evt && evt.type === 'touchend' && evt.changedTouches ? evt.changedTouches[0] : evt;
+            const raw = evt.target || (evt.changedTouches && evt.changedTouches[0] && evt.changedTouches[0].target);
+            const btn = (raw && raw.closest) ? raw.closest('.mobile-item') : (evt.target ? evt.target.closest('.mobile-item') : null);
             if (!btn) return;
-            e.preventDefault();
+            try { evt.preventDefault && evt.preventDefault(); } catch (err) {}
             const targetId = btn.getAttribute('data-target');
             if (!targetId) return;
-            // Try to find sidebar menu element with this id and trigger its click
-            const sidebarEl = document.getElementById(targetId);
+            // Try to find sidebar menu element with this id and trigger its click handler if present
+            let sidebarEl = document.getElementById(targetId);
+            if (!sidebarEl && targetId && targetId.startsWith('menu-')) {
+                // fallback: many sidebar anchors use data-i18n="menu.x" instead of id attributes
+                const dataKey = 'menu.' + targetId.slice('menu-'.length);
+                const candidate = document.querySelector(`[data-i18n="${dataKey}"]`);
+                if (candidate) sidebarEl = candidate.closest('.menu-item') || candidate;
+            }
             if (sidebarEl) {
-                sidebarEl.click();
+                try { sidebarEl.click(); } catch (e) { /* ignore */ }
                 // Visually mark active on toolbar
                 mobileToolbar.querySelectorAll('.mobile-item').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
@@ -158,14 +174,21 @@ function initCabinet() {
                 'menu-attendance': loadAttendanceControl,
                 'menu-communication': loadCommunication,
                 'menu-settings': loadSettings,
-                'menu-review-comments': loadReviewComments
+                'menu-review-comments': loadReviewComments,
+                'back-to-site-btn': () => { window.location.href = '/'; },
+                'logout-btn': () => { window.location.href = '/logout/'; }
             };
             if (fnMap[targetId]) {
-                fnMap[targetId]();
+                try { fnMap[targetId](); } catch (err) { console.error('mobile toolbar action failed', err); }
                 mobileToolbar.querySelectorAll('.mobile-item').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
             }
-        });
+        };
+
+        mobileToolbar.addEventListener('click', handleMobileAction, { passive: false });
+        // also handle touch and pointer end events for better responsiveness on mobile devices
+        mobileToolbar.addEventListener('touchend', handleMobileAction, { passive: false });
+        mobileToolbar.addEventListener('pointerup', handleMobileAction);
     }
 
     // Also attach delegated handler in case menu nodes are replaced by other scripts
@@ -209,6 +232,20 @@ function initCabinet() {
         }
         if (window.applyTranslations) window.applyTranslations(localStorage.getItem('site_lang') || 'en');
     });
+
+    // ensure mobile toolbar is visible even if CSS has conflicts
+    try {
+        const mt = document.querySelector('.mobile-toolbar');
+        if (mt) {
+            mt.style.display = mt.style.display || 'flex';
+            mt.setAttribute('aria-hidden', 'false');
+            mt.classList.remove('hidden');
+        }
+    } catch (e) { console.warn('mobile-toolbar show failed', e); }
+
+    } catch (err) {
+        console.error('initCabinet error', err && (err.message || err));
+    }
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initCabinet); else initCabinet();
@@ -1025,6 +1062,19 @@ function loadCoachesForAttendance() {
         }
         showNotification('error', error.message || 'Error');
     });
+}
+
+// Populate a select with available trainers (used in attendance form)
+function renderTrainerOptions(selectId, selectedId) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    const placeholder = (window.t && typeof window.t === 'function') ? window.t('placeholder.select_trainer', 'Select trainer') : 'Select trainer';
+    let html = `<option value="">${placeholder}</option>`;
+    (coachCache || []).forEach(c => {
+        const label = c.nickname || c.email || ('Coach ' + (c.id || ''));
+        html += `<option value="${c.id}" ${selectedId && String(c.id) === String(selectedId) ? 'selected' : ''}>${label}</option>`;
+    });
+    select.innerHTML = html;
 }
 
 function addAttendanceRecord() {

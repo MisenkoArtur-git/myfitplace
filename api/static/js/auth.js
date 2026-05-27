@@ -42,6 +42,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('auth-modal');
     const openAuthBtn = document.getElementById('open-auth-btn');
     const closeBtn = document.getElementById('close-modal-btn');
+    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+    const fabToggle = document.getElementById('fab-toggle');
+    const fabMenu = document.getElementById('fab-menu');
     
     const loginForm = document.getElementById('login-form');
     const signupForm = document.getElementById('signup-form');
@@ -63,6 +66,65 @@ document.addEventListener('DOMContentLoaded', () => {
     if (openAuthBtn2 && modal) {
         openAuthBtn2.addEventListener('click', (e) => { e.preventDefault(); modal.style.cssText = 'display: flex !important'; });
     }
+    if (mobileMenuToggle) {
+        mobileMenuToggle.addEventListener('click', (e) => {
+            const header = document.querySelector('.main-header');
+            if (!header) return;
+            const open = header.classList.toggle('menu-open');
+            mobileMenuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            mobileMenuToggle.textContent = open ? 'Close' : 'Menu';
+            // adjust main padding based on new header size when menu opens/closes
+            try { updateHeaderHeight(); } catch (e) {}
+        });
+    }
+    // Floating FAB toggle: open/close vertical menu
+    if (fabToggle && fabMenu) {
+        fabToggle.addEventListener('click', (e) => {
+            const open = document.body.classList.toggle('fab-open');
+            fabToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            fabMenu.setAttribute('aria-hidden', open ? 'false' : 'true');
+            // update header height after menu change
+            try { updateHeaderHeight(); } catch (e) {}
+        });
+        // close on outside click
+        window.addEventListener('click', (e) => {
+            if (!document.body.classList.contains('fab-open')) return;
+            if (e.target === fabToggle || fabToggle.contains(e.target) || fabMenu.contains(e.target)) return;
+            document.body.classList.remove('fab-open');
+            fabToggle.setAttribute('aria-expanded', 'false');
+            fabMenu.setAttribute('aria-hidden', 'true');
+            try { updateHeaderHeight(); } catch (e) {}
+        });
+        // close on Escape
+        window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { document.body.classList.remove('fab-open'); fabToggle.setAttribute('aria-expanded', 'false'); fabMenu.setAttribute('aria-hidden', 'true'); try { updateHeaderHeight(); } catch (err) {} } });
+    }
+
+    // Dynamically compute header height and set CSS variable so main content
+    // is always positioned below the fixed header (prevents header overlapping hero)
+    function updateHeaderHeight() {
+        const header = document.querySelector('.main-header');
+        if (!header) return;
+        const rect = header.getBoundingClientRect();
+        const h = Math.ceil(rect.height);
+        // Also measure mobile toolbar height (if visible) and expose as CSS variable
+        let mt = 0;
+        try {
+            const mobileToolbar = document.querySelector('.mobile-toolbar');
+            if (mobileToolbar) {
+                const style = window.getComputedStyle(mobileToolbar);
+                const r2 = mobileToolbar.getBoundingClientRect();
+                    if (r2.height > 0 && style.display !== 'none' && style.visibility !== 'hidden') mt = Math.ceil(r2.height);
+                    // add small buffer so content never gets too close to toolbar
+                    if (mt > 0) mt = mt + 18; // extra 18px padding
+            }
+        } catch (e) { mt = 0; }
+
+        document.documentElement.style.setProperty('--header-height', h + 'px');
+        document.documentElement.style.setProperty('--mobile-toolbar-height', mt + 'px');
+    }
+    // Call on load and when window resizes
+    try { updateHeaderHeight(); } catch (e) {}
+    window.addEventListener('resize', () => { try { updateHeaderHeight(); } catch (e) {} });
     if (closeBtn && modal) {
         closeBtn.addEventListener('click', () => { modal.style.cssText = 'display: none !important'; });
     }
@@ -263,6 +325,29 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+    // Also bind mobile logout button if present
+    const logoutLinkMobile = document.getElementById('logout-btn-mobile');
+    if (logoutLinkMobile) {
+        logoutLinkMobile.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const url = logoutLinkMobile.getAttribute('href') || '/logout/';
+            const csrfTokenEl = document.querySelector('[name=csrfmiddlewaretoken]');
+            const headers = { 'Content-Type': 'application/json' };
+            if (csrfTokenEl) headers['X-CSRFToken'] = csrfTokenEl.value;
+            try {
+                const resp = await fetch(url, { method: 'POST', headers });
+                if (resp.ok) {
+                    showNotification('success', tr('auth.logged_out', 'You have logged out'));
+                    setTimeout(() => window.location.reload(), 900);
+                } else {
+                    showNotification('error', tr('auth.logout_error', 'Error logging out'));
+                }
+            } catch (err) {
+                showNotification('error', tr('network.error', 'Network error'));
+            }
+        });
+    }
+
     // show/hide password checkboxes (styled like Remember me)
     document.querySelectorAll('.show-pass-checkbox').forEach(cb => {
         cb.addEventListener('change', () => {
@@ -372,28 +457,16 @@ document.addEventListener('DOMContentLoaded', () => {
         commentStarsFull.forEach(star => {
             star.addEventListener('click', () => {
                 const value = Number(star.dataset.value);
-                if (commentRatingFull) commentRatingFull.value = value;
-                // check corresponding radio if exists
-                const radio = document.querySelector(`input[name="rating-full"][value="${value}"]`);
-                if (radio) radio.checked = true;
-                commentStarsFull.forEach(s => s.classList.toggle('active', Number(s.dataset.value) <= value));
+                    if (commentRatingFull) commentRatingFull.value = value;
+                    // Update star visuals only; radios were removed from the template
+                    commentStarsFull.forEach(s => s.classList.toggle('active', Number(s.dataset.value) <= value));
             });
         });
     } catch (err) {
         console.error('Error attaching star listeners', err);
     }
 
-    // Radios under stars: update hidden input and star visuals
-    const ratingRadios = document.querySelectorAll('input[name="rating-full"]');
-    if (ratingRadios && ratingRadios.length) {
-        ratingRadios.forEach(r => {
-            r.addEventListener('change', () => {
-                const val = Number(r.value);
-                if (commentRatingFull) commentRatingFull.value = val;
-                commentStarsFull.forEach(s => s.classList.toggle('active', Number(s.dataset.value) <= val));
-            });
-        });
-    }
+    // Radios removed: no listeners needed — stars update the hidden input directly
 
     async function loadComments() {
         const commentsList = document.getElementById('comments-list') || document.getElementById('comments-list-full');
@@ -500,9 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showNotification('success', tr('comment.sent_success', 'Review sent — it will be reviewed by the administrator.'));
                 commentTextFull.value = '';
                 if (commentRatingFull) commentRatingFull.value = '5';
-                // reset radios to default 5
-                const defaultRadio = document.querySelector('input[name="rating-full"][value="5"]');
-                if (defaultRadio) defaultRadio.checked = true;
+                // Radios were removed from template; just reset hidden input and visuals
                 commentStarsFull.forEach(s => s.classList.toggle('active', Number(s.dataset.value) <= 5));
                 loadComments();
             } catch (error) {
