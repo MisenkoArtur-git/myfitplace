@@ -6,11 +6,38 @@ document.addEventListener('DOMContentLoaded', () => {
         let data = null;
         try { data = text ? JSON.parse(text) : null; } catch (e) { throw new Error(text || 'Server returned non-JSON response'); }
         if (!resp.ok) {
-            const msg = (data && data.message) ? data.message : resp.statusText || 'Request failed';
-            throw new Error(msg);
+            const msg = (data && (data.error || data.message)) ? (data.error || data.message) : resp.statusText || 'Request failed';
+            const err = new Error(msg);
+            err.data = data;
+            throw err;
         }
         return data;
     }
+    // Simple toast notification
+    function showNotification(type, message, timeout = 5000) {
+        try {
+            const container = document.getElementById('site-notification') || (() => {
+                const el = document.createElement('div'); el.id = 'site-notification'; document.body.appendChild(el); return el;
+            })();
+            // remove existing banner(s) so there's only one
+            Array.from(container.children).forEach(c => c.remove());
+            const toast = document.createElement('div');
+            toast.className = 'site-toast ' + (type === 'error' ? 'site-toast-error' : 'site-toast-success');
+            // single-line centered message (no title)
+            toast.textContent = message;
+            container.appendChild(toast);
+            // Auto-remove after timeout
+            const tm = setTimeout(() => { toast.remove(); }, timeout);
+            // clicking anywhere clears
+            toast.addEventListener('click', () => { clearTimeout(tm); toast.remove(); });
+        } catch (e) { console.error('showNotification error', e); }
+    }
+    // expose globally so other scripts can call it
+    try { window.showNotification = showNotification; } catch (e) {}
+    function tr(key, fallback) {
+        try { return (window.t && typeof window.t === 'function') ? window.t(key) : fallback; } catch (e) { return fallback; }
+    }
+        const BASE_FOTO = (window.location && window.location.origin ? window.location.origin : '') + '/media/users/base_foto.jpg';
     // 1. Инициализация элементов
     const modal = document.getElementById('auth-modal');
     const openAuthBtn = document.getElementById('open-auth-btn');
@@ -55,54 +82,235 @@ document.addEventListener('DOMContentLoaded', () => {
     backToLogin?.addEventListener('click', (e) => { e.preventDefault(); showForm(loginForm); });
 
     // 4. Логика отправки Login
-    if (submitLogin) {
-        submitLogin.addEventListener('click', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-            
-            try {
-                await fetchJson('/login-api/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                    body: JSON.stringify({ 'login-email': email, 'login-password': password })
-                });
-                window.location.reload();
-            } catch (error) { alert(error.message || 'Невірний логін або пароль'); }
+    // Universal AJAX form submit helper
+    async function ajaxSubmitForm(formEl, url, opts = {}) {
+        // opts: onSuccess(json), method
+        const method = (opts.method || 'POST').toUpperCase();
+        // clear previous invalid markers
+        formEl.querySelectorAll('.input-invalid').forEach(el => el.classList.remove('input-invalid'));
+
+        // collect data from inputs with name
+        const data = {};
+        formEl.querySelectorAll('input[name], textarea[name], select[name]').forEach(el => {
+            const name = el.getAttribute('name');
+            if (!name) return;
+            if (el.type === 'checkbox') data[name] = el.checked;
+            else data[name] = el.value;
         });
+
+        // basic client-side validation rules (email, password, nickname)
+        const emailEl = formEl.querySelector('input[type="email"][name]');
+        if (emailEl && emailEl.value) {
+            const emailRe = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+            if (!emailRe.test(emailEl.value)) {
+                emailEl.classList.add('input-invalid');
+                showNotification('error', tr('validation.email_invalid', 'Please enter a valid email.'));
+                return;
+            }
+        }
+
+        const passEl = formEl.querySelector('input[type="password"][name*="password"]');
+        const passConfirmEl = formEl.querySelector('input[type="password"][name*="confirm"]');
+        if (passEl && passEl.value) {
+            if (passEl.value.length < 8) {
+                passEl.classList.add('input-invalid');
+                showNotification('error', tr('validation.password_short', 'Password must be at least 8 characters.'));
+                return;
+            }
+        }
+        if (passEl && passConfirmEl && passEl.value !== passConfirmEl.value) {
+            passConfirmEl.classList.add('input-invalid');
+            showNotification('error', tr('validation.passwords_mismatch', 'Passwords do not match.'));
+            return;
+        }
+
+        const nicknameEl = formEl.querySelector('input[name="signup-nickname"]');
+        if (nicknameEl && nicknameEl.value) {
+            if (nicknameEl.value.length < 2 || nicknameEl.value.length > 50) {
+                    nicknameEl.classList.add('input-invalid');
+                    showNotification('error', tr('validation.nickname_length', 'Nickname must be between 2 and 50 characters.'));
+                return;
+            }
+        }
+
+        // send JSON
+        const csrfTokenEl = document.querySelector('[name=csrfmiddlewaretoken]');
+        const headers = { 'Content-Type': 'application/json' };
+        if (csrfTokenEl) headers['X-CSRFToken'] = csrfTokenEl.value;
+
+        let resp;
+        try {
+            resp = await fetch(url, { method, headers, body: JSON.stringify(data) });
+        } catch (err) {
+            showNotification('error', tr('network.error', 'Network error'));
+            return;
+        }
+
+        if (resp.ok) {
+            let json = {};
+            try { json = await resp.json(); } catch (e) {}
+            const msg = (json && (json.message || json.status === 'success' && json.message)) || tr('generic.success', 'Success');
+            showNotification('success', msg);
+            if (typeof opts.onSuccess === 'function') opts.onSuccess(json);
+            return json;
+        }
+
+        // handle error response
+        let errJson = null;
+        try { errJson = await resp.json(); } catch (e) {}
+        // If server returned structured field errors, display them under inputs
+        if (errJson && errJson.errors) {
+            try {
+                Object.keys(errJson.errors).forEach(field => {
+                    // map server field keys to form input names/ids
+                    const fieldId = field.startsWith('signup-') ? field : field;
+                    const el = formEl.querySelector(`[name="${fieldId}"]`) || formEl.querySelector(`[name*="${field}"]`);
+                    const errEl = document.getElementById((el && el.getAttribute('name')) ? el.getAttribute('name') + '-error' : (field + '-error'));
+                    if (errEl) errEl.textContent = Array.isArray(errJson.errors[field]) ? errJson.errors[field].join('; ') : errJson.errors[field];
+                    if (el) el.classList.add('input-invalid');
+                });
+            } catch (e) { console.error('Rendering field errors failed', e); }
+            // also show a brief toast summary
+            const summary = Object.values(errJson.errors).flat().slice(0,3).join('; ');
+            showNotification('error', summary || tr('validation.error', 'Validation error'));
+            return;
+        }
+
+        const errMsg = (errJson && (errJson.error || errJson.message)) || resp.statusText || tr('server.error', 'Server error');
+        showNotification('error', errMsg);
+        return null;
     }
+
+    if (submitLogin) {
+            submitLogin.addEventListener('click', (e) => {
+                e.preventDefault();
+                ajaxSubmitForm(loginForm, '/login-api/', { onSuccess: (json) => {
+                    // Remember email logic...
+                    const email = document.getElementById('login-email')?.value || '';
+                    const rememberCb = document.getElementById('login-remember');
+                    try {
+                        if (rememberCb && rememberCb.checked) localStorage.setItem('rememberedEmail', email);
+                        else localStorage.removeItem('rememberedEmail');
+                    } catch (err) {}
+
+                    // ИСПРАВЛЕННЫЙ БЛОК:
+                    // Мы принудительно используем только функцию перевода tr()
+                    showNotification('success', tr('auth.logged_in', 'Logged in'));
+                    setTimeout(() => window.location.reload(), 900);
+                }});
+            });
+        }
+
+    // On load, prefill login email only if user previously chose Remember me
+    try {
+        const saved = localStorage.getItem('rememberedEmail');
+        const emailInput = document.getElementById('login-email');
+        const rememberCb = document.getElementById('login-remember');
+        if (saved && emailInput) {
+            emailInput.value = saved;
+            if (rememberCb) rememberCb.checked = true;
+        } else if (rememberCb) {
+            rememberCb.checked = false;
+        }
+    } catch (err) { /* ignore storage errors */ }
+
+    // Logout handler: intercept logout link and perform POST to return JSON
+    const logoutLink = document.getElementById('logout-btn');
+        if (logoutLink) {
+            logoutLink.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const url = logoutLink.getAttribute('href') || '/logout/';
+                const csrfTokenEl = document.querySelector('[name=csrfmiddlewaretoken]');
+                const headers = { 'Content-Type': 'application/json' };
+                if (csrfTokenEl) headers['X-CSRFToken'] = csrfTokenEl.value;
+                
+                try {
+                    const resp = await fetch(url, { method: 'POST', headers });
+                    if (resp.ok) {
+                        // Используем ТОЛЬКО tr(), игнорируя сообщение сервера
+                        showNotification('success', tr('auth.logged_out', 'You have logged out'));
+                        setTimeout(() => window.location.reload(), 900);
+                    } else {
+                        // Используем ТОЛЬКО tr() для ошибки
+                        showNotification('error', tr('auth.logout_error', 'Error logging out'));
+                    }
+                } catch (err) {
+                    showNotification('error', tr('network.error', 'Network error'));
+                }
+            });
+        }
+
+    // show/hide password checkboxes (styled like Remember me)
+    document.querySelectorAll('.show-pass-checkbox').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const targets = (cb.dataset.targets || cb.getAttribute('data-targets') || cb.dataset.target || cb.getAttribute('data-target'));
+            if (!targets) return;
+            const ids = targets.split(',').map(s => s.trim()).filter(Boolean);
+            ids.forEach(id => {
+                const input = document.getElementById(id);
+                if (!input) return;
+                input.type = cb.checked ? 'text' : 'password';
+            });
+        });
+    });
 
     // 5. Логика отправки Sign Up
     if (submitSignup) {
-        submitSignup.addEventListener('click', async (e) => {
+        submitSignup.addEventListener('click', (e) => {
             e.preventDefault();
-            
-            const nickname = document.getElementById('signup-nickname').value;
-            const email = document.getElementById('signup-email').value;
-            const password = document.getElementById('signup-password').value;
-            const confirmPassword = document.getElementById('signup-password-confirm').value;
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-
-            if (password !== confirmPassword) {
-                alert('Паролі не співпадають!');
-                return;
-            }
-
-            try {
-                await fetchJson('/signup-api/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                    body: JSON.stringify({ 'signup-nickname': nickname, 'signup-email': email, 'signup-password': password, 'signup-password-confirm': confirmPassword })
-                });
-                alert('Реєстрація успішна!');
-                window.location.reload();
-            } catch (error) {
-                console.error('Ошибка:', error);
-                alert(error.message || 'Помилка при реєстрації.');
-            }
+            ajaxSubmitForm(signupForm, '/signup-api/', { onSuccess: () => window.location.reload() });
         });
     }
+
+    // Real-time validation for signup fields (optional immediate feedback)
+    function renderPwChecklist(elId, pw) {
+        const pwChecks = {
+            length: pw.length >= 8,
+            upper: /[A-Z]/.test(pw),
+            lower: /[a-z]/.test(pw),
+            digit: /\d/.test(pw),
+            special: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pw)
+        };
+        const el = document.getElementById(elId + '-error');
+        if (!el) return;
+        el.innerHTML = `<ul class="pw-req">
+            <li class="${pwChecks.length ? 'met' : 'unmet'}">At least 8 characters</li>
+            <li class="${pwChecks.upper ? 'met' : 'unmet'}">At least one uppercase letter</li>
+            <li class="${pwChecks.lower ? 'met' : 'unmet'}">At least one lowercase letter</li>
+            <li class="${pwChecks.digit ? 'met' : 'unmet'}">At least one number</li>
+            <li class="${pwChecks.special ? 'met' : 'unmet'}">At least one special character</li>
+        </ul>`;
+    }
+
+    const liveChecks = [
+        { id: 'signup-email', fn: (v) => (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) || 'Введите корректный email.' },
+        { id: 'signup-password', fn: (v) => true },
+        { id: 'signup-password-confirm', fn: (v) => true },
+        { id: 'signup-nickname', fn: (v) => (!v || (v.length >=2 && v.length <=50)) || 'Никнейм должен быть от 2 до 50 символов.' },
+    ];
+    liveChecks.forEach(ch => {
+        const el = document.getElementById(ch.id);
+        if (!el) return;
+        el.addEventListener('input', () => {
+            const res = ch.fn(el.value);
+            const errEl = document.getElementById(ch.id + '-error');
+            if (ch.id === 'signup-password') {
+                renderPwChecklist('signup-password', el.value);
+                if (el.value.length === 0) {
+                    if (errEl) errEl.textContent = '';
+                    el.classList.remove('input-invalid');
+                }
+                return;
+            }
+            if (res === true) {
+                if (errEl) errEl.textContent = '';
+                el.classList.remove('input-invalid');
+            } else {
+                if (errEl) errEl.textContent = res;
+                el.classList.add('input-invalid');
+            }
+        });
+    });
 
     // Small footer controls (deprecated) - kept for backward compatibility
     const commentStars = document.querySelectorAll('#comment-stars .star');
@@ -183,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             commentsList.innerHTML = data.comments.map(comment => {
                 const statusBadge = comment.status === 'pending'
-                    ? `<span class="pending-label">Pending approval</span>`
+                    ? `<span class="pending-label">${(window.t && typeof window.t === 'function') ? window.t('review.pending_label','Pending approval') : 'Pending approval'}</span>`
                     : '';
                 const mineLabel = comment.is_mine ? '<span class="mine-label">(Your review)</span>' : '';
                 
@@ -192,9 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     i < comment.rating ? '★' : '☆'
                 ).join('');
 
-                const avatarHtml = comment.author_avatar
-                    ? `<img class="comment-avatar" src="${comment.author_avatar}" alt="avatar">`
-                    : `<span class="comment-avatar placeholder"></span>`;
+                const avatarHtml = `<img class="comment-avatar" src="${comment.author_avatar || BASE_FOTO}" alt="avatar">`;
 
                 return `
                     <div class="comment-item">
@@ -222,24 +428,28 @@ document.addEventListener('DOMContentLoaded', () => {
     if (submitCommentBtn) {
         submitCommentBtn.addEventListener('click', async (e) => {
             e.preventDefault();
+            if (window.IS_AUTH === false || document.getElementById('open-auth-btn')) {
+                showNotification('error', tr('comments.auth_required', 'Only registered users can leave comments.'));
+                return;
+            }
             const rating = Number(commentRatingInput?.value || 0);
             const text = commentText.value.trim();
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
             if (!text) {
-                alert('Please enter a review message.');
+                showNotification('error', tr('comment.enter_text', 'Please enter review text.'));
                 return;
             }
 
             try {
                 await fetchJson('/comment-create-api/', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }, body: JSON.stringify({ comment_text: text, comment_rating: rating }) });
-                alert('Your review was submitted and is pending admin approval.');
+                showNotification('success', tr('comment.sent_success', 'Review sent — it will be reviewed by the administrator.'));
                 commentText.value = '';
                 if (commentRatingInput) commentRatingInput.value = '0';
                 updateStarDisplay(0);
                 loadComments();
             } catch (error) {
-                alert(error.message || 'Server error while sending your comment.');
+                showNotification('error', error.message || tr('comment.send_error', 'Error sending review.'));
             }
         });
     }
@@ -251,21 +461,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!rating || rating < 1 || rating > 5) rating = 5; // enforce 1-5
             const text = commentTextFull.value.trim();
             const authFlag = submitCommentFull.dataset.auth === '1';
-            if (!authFlag) {
-                // open auth modal for anonymous users
-                if (modal) modal.style.display = 'flex';
+            if (!authFlag || window.IS_AUTH === false) {
+                showNotification('error', tr('comments.auth_required', 'Only registered users can leave comments.'));
                 return;
             }
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
             if (!text) {
-                alert('Please enter a review message.');
+                showNotification('error', tr('comment.enter_text', 'Please enter review text.'));
                 return;
             }
 
             try {
                 await fetchJson('/comment-create-api/', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }, body: JSON.stringify({ comment_text: text, comment_rating: rating }) });
-                alert('Your review was submitted and is pending admin approval.');
+                showNotification('success', tr('comment.sent_success', 'Review sent — it will be reviewed by the administrator.'));
                 commentTextFull.value = '';
                 if (commentRatingFull) commentRatingFull.value = '5';
                 // reset radios to default 5
@@ -274,7 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 commentStarsFull.forEach(s => s.classList.toggle('active', Number(s.dataset.value) <= 5));
                 loadComments();
             } catch (error) {
-                alert(error.message || 'Server error while sending your comment.');
+                showNotification('error', error.message || tr('comment.send_error', 'Error sending review.'));
             }
         });
     }

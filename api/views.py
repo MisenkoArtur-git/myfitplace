@@ -1,4 +1,9 @@
 import json
+import re
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth import get_user_model
 from datetime import datetime, date
 from django.db.models import Q, Avg
 from django.shortcuts import render, redirect
@@ -8,6 +13,17 @@ from django.contrib.auth import update_session_auth_hash
 from django.http import JsonResponse
 from django.utils import timezone
 from .models import User, GymHall, Schedule, Message, Comment, Conversation
+from django.conf import settings
+
+
+def get_avatar_url(user, request):
+    """Return absolute avatar URL for a user, or default base_foto.jpg if missing."""
+    if getattr(user, 'photo', None):
+        try:
+            return request.build_absolute_uri(user.photo.url)
+        except Exception:
+            pass
+    return request.build_absolute_uri(settings.MEDIA_URL + 'users/base_foto.jpg')
 
 @login_required
 def profile_api(request):
@@ -20,7 +36,7 @@ def profile_api(request):
             'phone': user.phone or '',
             'spec': user.spec or '',
             'description': user.description or '',
-            'avatar': user.photo.url if getattr(user, 'photo', None) else None,
+            'avatar': get_avatar_url(user, request),
         }})
 
     # POST - update profile (accepts multipart/form-data)
@@ -58,9 +74,9 @@ def profile_api(request):
             # password change: only require new password and confirmation (no current password)
             if new_password or new_password_confirm:
                 if not new_password or not new_password_confirm:
-                    return JsonResponse({'status': 'error', 'message': 'Both new password fields are required'}, status=400)
+                    return JsonResponse({'error': 'Оба поля нового пароля обязательны'}, status=400)
                 if new_password != new_password_confirm:
-                    return JsonResponse({'status': 'error', 'message': 'New password and confirmation do not match'}, status=400)
+                    return JsonResponse({'error': 'Новый пароль и подтверждение не совпадают'}, status=400)
                 user.set_password(new_password)
 
             # handle avatar upload
@@ -78,9 +94,9 @@ def profile_api(request):
 
             return JsonResponse({'status': 'success'})
         except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+            return JsonResponse({'error': str(e)}, status=400)
 
-    return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 def index(request):
     return render(request, 'api/index.html')
@@ -97,10 +113,10 @@ def login_api(request):
 
         if user is not None:
             login(request, user)
-            return JsonResponse({'status': 'success'})
-        return JsonResponse({'status': 'error', 'message': 'Invalid credentials'}, status=400)
+            return JsonResponse({'status': 'success', 'message': 'Вход выполнен'})
+        return JsonResponse({'error': 'Неверные учетные данные'}, status=400)
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+        return JsonResponse({'error': str(e)}, status=400)
 
 def signup_api(request):
     if request.method != 'POST':
@@ -112,24 +128,77 @@ def signup_api(request):
         password = data.get('signup-password')
         nickname = data.get('signup-nickname')
         confirm_password = data.get('signup-password-confirm')
+        errors = {}
+
+        # Email validation
+        if not email:
+            errors['signup-email'] = 'Email обязателен.'
+        else:
+            try:
+                validate_email(email)
+            except DjangoValidationError:
+                errors['signup-email'] = 'Введите корректный email.'
+
+        # Password and confirmation
+        password_errors = []
+        if not password:
+            password_errors.append('Пароль обязателен.')
+        else:
+            if len(password) < 8:
+                password_errors.append('Пароль должен быть не менее 8 символов.')
+
+            # Use Django's password validators if configured
+            try:
+                validate_password(password)
+            except DjangoValidationError as ex:
+                for m in ex.messages:
+                    password_errors.append(m)
+
+            # Ensure at least one uppercase, one lowercase, one digit and one special character
+            if not re.search(r"[A-Z]", password):
+                password_errors.append('Пароль должен содержать хотя бы одну заглавную букву.')
+            if not re.search(r"[a-z]", password):
+                password_errors.append('Пароль должен содержать хотя бы одну строчную букву.')
+            if not re.search(r"\d", password):
+                password_errors.append('Пароль должен содержать хотя бы одну цифру.')
+            if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", password):
+                password_errors.append('Пароль должен содержать хотя бы один специальный символ.')
 
         if password != confirm_password:
-            return JsonResponse({'status': 'error', 'message': 'Passwords do not match'}, status=400)
+            errors['signup-password-confirm'] = 'Пароли не совпадают.'
 
-        if User.objects.filter(email=email).exists():
-            return JsonResponse({'status': 'error', 'message': 'User with this email already exists'}, status=400)
+        if password_errors:
+            # Deduplicate messages while preserving order
+            seen = set()
+            dedup = []
+            for m in password_errors:
+                if m not in seen:
+                    dedup.append(m)
+                    seen.add(m)
+            errors['signup-password'] = dedup
 
-        user = User.objects.create_user(
-            email=email,
-            password=password,
-            nickname=nickname,
-            role='CLIENT'
-        )
+        # Existing user
+        if email and User.objects.filter(email=email).exists():
+            errors['signup-email'] = 'Пользователь с таким email уже существует.'
+
+        if errors:
+            return JsonResponse({'errors': errors}, status=400)
+
+        # Create user
+        try:
+            user = User.objects.create_user(
+                email=email,
+                password=password,
+                nickname=nickname,
+                role='CLIENT'
+            )
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
         login(request, user)
         return JsonResponse({'status': 'success', 'message': 'Account created successfully'})
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+        return JsonResponse({'error': str(e)}, status=400)
 
 
 def comments_api(request):
@@ -150,7 +219,7 @@ def comments_api(request):
         result.append({
             'id': comment.id,
             'author_name': comment.author.nickname or comment.author.email,
-            'author_avatar': comment.author.photo.url if getattr(comment.author, 'photo', None) else None,
+            'author_avatar': get_avatar_url(comment.author, request),
             'rating': comment.rating,
             'text': comment.text,
             'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M'),
@@ -169,7 +238,7 @@ def comment_create_api(request):
         return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
 
     if not request.user.is_authenticated:
-        return JsonResponse({'status': 'error', 'message': 'Authentication required'}, status=403)
+        return JsonResponse({'error': 'Требуется аутентификация'}, status=403)
 
     try:
         data = json.loads(request.body)
@@ -178,7 +247,7 @@ def comment_create_api(request):
         rating = max(0, min(rating, 5))
 
         if not text:
-            return JsonResponse({'status': 'error', 'message': 'Comment text is required'}, status=400)
+            return JsonResponse({'error': 'Текст отзыва обязателен'}, status=400)
 
         comment = Comment.objects.create(
             author=request.user,
@@ -189,7 +258,7 @@ def comment_create_api(request):
 
         return JsonResponse({'status': 'success', 'comment_id': comment.id})
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+        return JsonResponse({'error': str(e)}, status=400)
 
 
 @login_required
@@ -208,7 +277,7 @@ def review_comments_api(request):
         pending_data.append({
             'id': comment.id,
             'author_name': comment.author.nickname or comment.author.email,
-            'author_avatar': comment.author.photo.url if getattr(comment.author, 'photo', None) else None,
+            'author_avatar': get_avatar_url(comment.author, request),
             'rating': comment.rating,
             'text': comment.text,
             'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M'),
@@ -219,13 +288,13 @@ def review_comments_api(request):
         logs_data.append({
             'id': comment.id,
             'author_name': comment.author.nickname or comment.author.email,
-            'author_avatar': comment.author.photo.url if getattr(comment.author, 'photo', None) else None,
+            'author_avatar': get_avatar_url(comment.author, request),
             'rating': comment.rating,
             'text': comment.text,
             'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M'),
             'status': comment.status,
             'reviewed_by': (comment.reviewed_by.nickname or comment.reviewed_by.email) if comment.reviewed_by else '',
-            'reviewed_by_avatar': comment.reviewed_by.photo.url if getattr(comment.reviewed_by, 'photo', None) else None,
+            'reviewed_by_avatar': get_avatar_url(comment.reviewed_by, request) if comment.reviewed_by else get_avatar_url(User(), request),
             'reviewed_at': comment.reviewed_at.strftime('%Y-%m-%d %H:%M') if comment.reviewed_at else None,
         })
 
@@ -261,10 +330,22 @@ def review_comments_action_api(request):
                 comment.status = Comment.STATUS_APPROVED
                 comment.reviewed_by = request.user
                 comment.reviewed_at = timezone.now()
+                # Notify author about approval
+                try:
+                    Message.objects.create(sender=request.user, receiver=comment.author,
+                                           text=f'Ваш отзыв был одобрен.' )
+                except Exception:
+                    pass
             elif action == 'reject':
                 comment.status = Comment.STATUS_REJECTED
                 comment.reviewed_by = request.user
                 comment.reviewed_at = timezone.now()
+                # Notify author about rejection
+                try:
+                    Message.objects.create(sender=request.user, receiver=comment.author,
+                                           text=f'Ваш отзыв был отклонён.' )
+                except Exception:
+                    pass
             elif action == 'repost':
                 comment.status = Comment.STATUS_PENDING
                 comment.reviewed_by = None
@@ -297,7 +378,7 @@ def coach_api(request):
                 'description': coach.description or '',
                 'hall_id': coach.hall.id if coach.hall else None,
                 'hall_name': coach.hall.name if coach.hall else '',
-                'photo_url': request.build_absolute_uri(coach.photo.url) if coach.photo else '',
+                'photo_url': get_avatar_url(coach, request),
             })
         return JsonResponse({'status': 'success', 'coaches': coaches})
 
@@ -320,7 +401,7 @@ def client_api(request):
                 'description': client.description or '',
                 'hall_id': client.hall.id if client.hall else None,
                 'hall_name': client.hall.name if client.hall else '',
-                'photo_url': request.build_absolute_uri(client.photo.url) if client.photo else '',
+                'photo_url': get_avatar_url(client, request),
             })
         return JsonResponse({'status': 'success', 'clients': clients})
 
@@ -684,11 +765,49 @@ def client_save_api(request):
             from .models import GymHall
             hall = GymHall.objects.filter(id=hall_id).first()
 
-        if not email or not password:
-            return JsonResponse({'status': 'error', 'message': 'Email and password are required'}, status=400)
+        # validate email and password -> return field-level errors
+        errors = {}
+        if not email:
+            errors['email'] = 'Email обязателен.'
+        else:
+            try:
+                validate_email(email)
+            except DjangoValidationError:
+                errors['email'] = 'Введите корректный email.'
+
+        pw_msgs = []
+        if not password:
+            pw_msgs.append('Пароль обязателен.')
+        else:
+            if len(password) < 8:
+                pw_msgs.append('Пароль должен быть не менее 8 символов.')
+            try:
+                validate_password(password)
+            except DjangoValidationError as ex:
+                for m in ex.messages:
+                    pw_msgs.append(m)
+            if not re.search(r'[A-Z]', password):
+                pw_msgs.append('Пароль должен содержать хотя бы одну заглавную букву.')
+            if not re.search(r'[a-z]', password):
+                pw_msgs.append('Пароль должен содержать хотя бы одну строчную букву.')
+            if not re.search(r'\d', password):
+                pw_msgs.append('Пароль должен содержать хотя бы одну цифру.')
+            if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", password):
+                pw_msgs.append('Пароль должен содержать хотя бы один специальный символ.')
+
+        if pw_msgs:
+            # dedupe
+            seen = set(); dedup = []
+            for m in pw_msgs:
+                if m not in seen:
+                    dedup.append(m); seen.add(m)
+            errors['password'] = '; '.join(dedup)
 
         if User.objects.filter(email=email).exists():
-            return JsonResponse({'status': 'error', 'message': 'User with this email already exists'}, status=400)
+            errors['email'] = 'Пользователь с таким email уже существует.'
+
+        if errors:
+            return JsonResponse({'errors': errors}, status=400)
 
         client = User.objects.create_user(
             email=email,
@@ -790,11 +909,49 @@ def coach_save_api(request):
             from .models import GymHall
             hall = GymHall.objects.filter(id=hall_id).first()
 
-        if not email or not password:
-            return JsonResponse({'status': 'error', 'message': 'Email and password are required'}, status=400)
+        # validate email and password -> return field-level errors
+        errors = {}
+        if not email:
+            errors['email'] = 'Email обязателен.'
+        else:
+            try:
+                validate_email(email)
+            except DjangoValidationError:
+                errors['email'] = 'Введите корректный email.'
+
+        pw_msgs = []
+        if not password:
+            pw_msgs.append('Пароль обязателен.')
+        else:
+            if len(password) < 8:
+                pw_msgs.append('Пароль должен быть не менее 8 символов.')
+            try:
+                validate_password(password)
+            except DjangoValidationError as ex:
+                for m in ex.messages:
+                    pw_msgs.append(m)
+            if not re.search(r'[A-Z]', password):
+                pw_msgs.append('Пароль должен содержать хотя бы одну заглавную букву.')
+            if not re.search(r'[a-z]', password):
+                pw_msgs.append('Пароль должен содержать хотя бы одну строчную букву.')
+            if not re.search(r'\d', password):
+                pw_msgs.append('Пароль должен содержать хотя бы одну цифру.')
+            if not re.search(r"[!@#$%^&*()_+\-=[\]{};':\"\\|,.<>\/?]", password):
+                pw_msgs.append('Пароль должен содержать хотя бы один специальный символ.')
+
+        if pw_msgs:
+            # dedupe
+            seen = set(); dedup = []
+            for m in pw_msgs:
+                if m not in seen:
+                    dedup.append(m); seen.add(m)
+            errors['password'] = '; '.join(dedup)
 
         if User.objects.filter(email=email).exists():
-            return JsonResponse({'status': 'error', 'message': 'User with this email already exists'}, status=400)
+            errors['email'] = 'Пользователь с таким email уже существует.'
+
+        if errors:
+            return JsonResponse({'errors': errors}, status=400)
 
         coach = User.objects.create_user(
             email=email,
@@ -833,8 +990,12 @@ def coach_save_api(request):
             hall = GymHall.objects.filter(id=hall_id).first()
 
         if email:
+            try:
+                validate_email(email)
+            except DjangoValidationError:
+                return JsonResponse({'errors': {'email': 'Введите корректный email.'}}, status=400)
             if User.objects.filter(email=email).exclude(id=coach.id).exists():
-                return JsonResponse({'status': 'error', 'message': 'Email is already used'}, status=400)
+                return JsonResponse({'errors': {'email': 'Email уже используется'}}, status=400)
             coach.email = email
 
         coach.nickname = nickname
@@ -844,6 +1005,24 @@ def coach_save_api(request):
         coach.hall = hall
 
         if password:
+            # validate provided password
+            pw_errs = []
+            if len(password) < 8:
+                pw_errs.append('Пароль должен быть не менее 8 символов.')
+            try:
+                validate_password(password)
+            except DjangoValidationError as ex:
+                for m in ex.messages: pw_errs.append(m)
+            if not re.search(r'[A-Z]', password): pw_errs.append('Пароль должен содержать хотя бы одну заглавную букву.')
+            if not re.search(r'[a-z]', password): pw_errs.append('Пароль должен содержать хотя бы одну строчную букву.')
+            if not re.search(r'\d', password): pw_errs.append('Пароль должен содержать хотя бы одну цифру.')
+            if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", password): pw_errs.append('Пароль должен содержать хотя бы один специальный символ.')
+            if pw_errs:
+                seen=set(); dedup=[]
+                for m in pw_errs:
+                    if m not in seen:
+                        dedup.append(m); seen.add(m)
+                return JsonResponse({'errors': {'password': '; '.join(dedup)}}, status=400)
             coach.set_password(password)
 
         photo = files.get('photo')
@@ -864,5 +1043,9 @@ def coach_save_api(request):
     return JsonResponse({'status': 'error', 'message': 'Unknown action'}, status=400)
 
 def logout_view(request):
+    # Support AJAX/POST logout returning JSON for frontend notifications
+    if request.method == 'POST' or request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        logout(request)
+        return JsonResponse({'status': 'success', 'message': 'Вы вышли из аккаунта'})
     logout(request)
     return redirect('index')

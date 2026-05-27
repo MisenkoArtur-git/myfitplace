@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MyFit.Place</title>
     <link rel="stylesheet" href="{% static 'css/index.css' %}">
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -24,7 +25,7 @@
             </div>
             {% if user.is_authenticated %}
                 <a href="/cabinet/" class="btn btn-login" data-i18n="nav.cabinet">Cabinet</a>
-                <a href="{% url 'logout' %}" class="btn btn-login" data-i18n="nav.logout">Logout</a>
+                <a href="{% url 'logout' %}" id="logout-btn" class="btn btn-login" data-i18n="nav.logout">Logout</a>
             {% else %}
                 <button class="btn btn-login" id="open-auth-btn" data-i18n="nav.login">Login/Sign Up</button>
             {% endif %}
@@ -146,16 +147,25 @@
         <div class="modal-container">
             <button class="close-btn" id="close-modal-btn"><i data-lucide="x"></i></button>
             
-            <form id="login-form" class="modal-form-content">
+            <form id="login-form" class="modal-form-content" autocomplete="off">
                 {% csrf_token %}
                 <div class="modal-logo">MyFit.Place <i data-lucide="dumbbell"></i></div>
                 <h2>Login</h2>
                 <input type="email" id="login-email" name="login-email" placeholder="Enter e-mail address.......">
-                <input type="password" id="login-password" name="login-password" placeholder="Password.......">
-                <div class="form-options">
-                    <label><input type="checkbox"> Remember me</label>
-                    <a href="#" id="to-recovery">Forgot your password?</a>
+                <div class="password-field">
+                    <input type="password" id="login-password" name="login-password" placeholder="Password.......">
                 </div>
+                <div class="form-options vertical-layout">
+                    <div class="option-item">
+                        <input type="checkbox" id="login-remember" class="remember-checkbox">
+                        <label for="login-remember">Remember me</label>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" id="login-show-password" class="show-pass-checkbox" data-targets="login-password">
+                        <label for="login-show-password">Show password</label>
+                    </div>
+                    <a href="#" id="to-recovery">Forgot your password?</a>
+                </div>            
                 <button type="submit" class="btn btn-submit" id="submit-login">Login</button>
                 <p class="switch-form">Don't have an account? <a href="#" id="to-signup">Sign Up</a></p>
             </form>
@@ -165,9 +175,22 @@
                 <div class="modal-logo">MyFit.Place <i data-lucide="dumbbell"></i></div>
                 <h2>Sign Up</h2>
                 <input type="text" id="signup-nickname" name="signup-nickname" placeholder="Nickname.......">
+                <div class="field-error" id="signup-nickname-error"></div>
+
                 <input type="email" id="signup-email" name="signup-email" placeholder="E-mail address.......">
-                <input type="password" id="signup-password" name="signup-password" placeholder="Create Password.......">
-                <input type="password" id="signup-password-confirm" name="signup-password-confirm" placeholder="Confirm Password.......">
+                <div class="field-error" id="signup-email-error"></div>
+
+                <div class="password-field">
+                    <input type="password" id="signup-password" name="signup-password" placeholder="Create Password.......">
+                </div>
+                <div class="field-error" id="signup-password-error"></div>
+
+                <div class="password-field">
+                    <input type="password" id="signup-password-confirm" name="signup-password-confirm" placeholder="Confirm Password.......">
+                </div>
+                <div class="field-error" id="signup-password-confirm-error"></div>
+                <label class="show-pass-label"><input type="checkbox" id="signup-show-password" class="show-pass-checkbox" data-targets="signup-password,signup-password-confirm"> Show password</label>
+
                 <button type="button" class="btn btn-submit" id="submit-signup">Sign Up</button>
                 <p class="switch-form">Already have an account? <a href="#" id="to-login">Log In</a></p>
             </div>
@@ -182,6 +205,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Global notification container -->
+    <div id="site-notification" aria-live="polite"></div>
 
     <script src="{% static 'js/i18n.js' %}"></script>
     <script src="{% static 'js/auth.js' %}"></script>

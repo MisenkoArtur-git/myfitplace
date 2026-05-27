@@ -31,40 +31,40 @@
 
         <!-- Mobile toolbar: visible on small screens, provides compact navigation under header -->
         <div class="mobile-toolbar" aria-hidden="true">
-            {% if user.role == 'ADMIN' %}
-                <button class="mobile-item" data-target="menu-coaches"><i data-lucide="shield-check"></i><span>Coaches</span></button>
-                <button class="mobile-item" data-target="menu-clients"><i data-lucide="users"></i><span>Clients</span></button>
-                <button class="mobile-item" data-target="menu-attendance"><i data-lucide="activity"></i><span>Attendance</span></button>
-                <button class="mobile-item" data-target="menu-reports"><i data-lucide="bar-chart-2"></i><span>Reports</span></button>
-                <button class="mobile-item" data-target="menu-review-comments"><i data-lucide="star"></i><span>Reviews</span></button>
-                <button class="mobile-item" data-target="menu-communication"><i data-lucide="message-square"></i><span>Chat</span></button>
-                <button class="mobile-item" data-target="menu-recovery"><i data-lucide="key"></i><span>Recovery</span></button>
-                <button class="mobile-item" data-target="back-to-site-btn"><i data-lucide="arrow-left"></i><span>Back</span></button>
-                <button class="mobile-item" data-target="menu-settings"><i data-lucide="settings"></i><span>Settings</span></button>
-                <button class="mobile-item" data-target="menu-help"><i data-lucide="help-circle"></i><span>Help</span></button>
-                <button class="mobile-item" data-target="logout-btn"><i data-lucide="log-out"></i><span>Log out</span></button>
-            {% elif user.role == 'MANAGER' %}
-                <button class="mobile-item" data-target="menu-coaches"><i data-lucide="shield-check"></i><span>Coaches</span></button>
-                <button class="mobile-item" data-target="menu-clients"><i data-lucide="users"></i><span>Clients</span></button>
-                <button class="mobile-item" data-target="menu-attendance"><i data-lucide="activity"></i><span>Attendance</span></button>
-                <button class="mobile-item" data-target="menu-communication"><i data-lucide="message-square"></i><span>Chat</span></button>
-                <button class="mobile-item" data-target="menu-halls"><i data-lucide="building"></i><span>Halls</span></button>
-                <button class="mobile-item" data-target="menu-settings"><i data-lucide="settings"></i><span>Settings</span></button>
-                <button class="mobile-item" data-target="logout-btn"><i data-lucide="log-out"></i><span>Log out</span></button>
-            {% elif user.role == 'COACH' %}
-                <button class="mobile-item" data-target="menu-training"><i data-lucide="dumbbell"></i><span>Training</span></button>
-                <button class="mobile-item" data-target="menu-view_clients"><i data-lucide="users"></i><span>Clients</span></button>
-                <button class="mobile-item" data-target="menu-communication"><i data-lucide="message-square"></i><span>Chat</span></button>
-                <button class="mobile-item" data-target="menu-support"><i data-lucide="life-buoy"></i><span>Support</span></button>
-                <button class="mobile-item" data-target="logout-btn"><i data-lucide="log-out"></i><span>Log out</span></button>
-            {% else %}
-                <button class="mobile-item" data-target="menu-profile_edit"><i data-lucide="user"></i><span>Profile</span></button>
-                <button class="mobile-item" data-target="menu-hall_filter"><i data-lucide="search"></i><span>Filter</span></button>
-                <button class="mobile-item" data-target="menu-book_training"><i data-lucide="calendar-plus"></i><span>Book</span></button>
-                <button class="mobile-item" data-target="menu-progress"><i data-lucide="trending-up"></i><span>Progress</span></button>
-                <button class="mobile-item" data-target="menu-communication"><i data-lucide="message-square"></i><span>Chat</span></button>
-                <button class="mobile-item" data-target="menu-support"><i data-lucide="life-buoy"></i><span>Support</span></button>
-                <button class="mobile-item" data-target="logout-btn"><i data-lucide="log-out"></i><span>Log out</span></button>
+                {% if user.role == 'ADMIN' %}
+                <button class="mobile-item" data-target="menu-coaches"><i data-lucide="shield-check"></i><span data-i18n="menu.coaches"></span></button>
+                <button class="mobile-item" data-target="menu-clients"><i data-lucide="users"></i><span data-i18n="menu.clients"></span></button>
+                <button class="mobile-item" data-target="menu-attendance"><i data-lucide="activity"></i><span data-i18n="menu.attendance"></span></button>
+                <button class="mobile-item" data-target="menu-reports"><i data-lucide="bar-chart-2"></i><span data-i18n="menu.reports"></span></button>
+                <button class="mobile-item" data-target="menu-review-comments"><i data-lucide="star"></i><span data-i18n="menu.review_comments"></span></button>
+                <button class="mobile-item" data-target="menu-communication"><i data-lucide="message-square"></i><span data-i18n="menu.communication"></span></button>
+                <button class="mobile-item" data-target="menu-recovery"><i data-lucide="key"></i><span data-i18n="menu.recovery"></span></button>
+                <button class="mobile-item" data-target="back-to-site-btn"><i data-lucide="arrow-left"></i><span data-i18n="menu.back"></span></button>
+                <button class="mobile-item" data-target="menu-settings"><i data-lucide="settings"></i><span data-i18n="menu.settings"></span></button>
+                <button class="mobile-item" data-target="menu-help"><i data-lucide="help-circle"></i><span data-i18n="menu.help"></span></button>
+                <button class="mobile-item" data-target="logout-btn"><i data-lucide="log-out"></i><span data-i18n="menu.logout"></span></button>
+                {% elif user.role == 'MANAGER' %}
+                <button class="mobile-item" data-target="menu-coaches"><i data-lucide="shield-check"></i><span data-i18n="menu.coaches"></span></button>
+                <button class="mobile-item" data-target="menu-clients"><i data-lucide="users"></i><span data-i18n="menu.clients"></span></button>
+                <button class="mobile-item" data-target="menu-attendance"><i data-lucide="activity"></i><span data-i18n="menu.attendance"></span></button>
+                <button class="mobile-item" data-target="menu-communication"><i data-lucide="message-square"></i><span data-i18n="menu.communication"></span></button>
+                <button class="mobile-item" data-target="menu-halls"><i data-lucide="building"></i><span data-i18n="menu.halls"></span></button>
+                <button class="mobile-item" data-target="menu-settings"><i data-lucide="settings"></i><span data-i18n="menu.settings"></span></button>
+                <button class="mobile-item" data-target="logout-btn"><i data-lucide="log-out"></i><span data-i18n="menu.logout"></span></button>
+                {% elif user.role == 'COACH' %}
+                <button class="mobile-item" data-target="menu-training"><i data-lucide="dumbbell"></i><span data-i18n="menu.training"></span></button>
+                <button class="mobile-item" data-target="menu-view_clients"><i data-lucide="users"></i><span data-i18n="menu.view_clients"></span></button>
+                <button class="mobile-item" data-target="menu-communication"><i data-lucide="message-square"></i><span data-i18n="menu.communication"></span></button>
+                <button class="mobile-item" data-target="menu-support"><i data-lucide="life-buoy"></i><span data-i18n="menu.support"></span></button>
+                <button class="mobile-item" data-target="logout-btn"><i data-lucide="log-out"></i><span data-i18n="menu.logout"></span></button>
+                {% else %}
+                <button class="mobile-item" data-target="menu-profile_edit"><i data-lucide="user"></i><span data-i18n="menu.profile_edit"></span></button>
+                <button class="mobile-item" data-target="menu-hall_filter"><i data-lucide="search"></i><span data-i18n="menu.hall_filter"></span></button>
+                <button class="mobile-item" data-target="menu-book_training"><i data-lucide="calendar-plus"></i><span data-i18n="menu.book_training"></span></button>
+                <button class="mobile-item" data-target="menu-progress"><i data-lucide="trending-up"></i><span data-i18n="menu.progress"></span></button>
+                <button class="mobile-item" data-target="menu-communication"><i data-lucide="message-square"></i><span data-i18n="menu.communication"></span></button>
+                <button class="mobile-item" data-target="menu-support"><i data-lucide="life-buoy"></i><span data-i18n="menu.support"></span></button>
+                <button class="mobile-item" data-target="logout-btn"><i data-lucide="log-out"></i><span data-i18n="menu.logout"></span></button>
             {% endif %}
         </div>
     <div class="cabinet-layout">

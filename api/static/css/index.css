@@ -664,6 +664,7 @@ textarea#comment-text {
 .form-options { 
     display: flex; 
     justify-content: space-between; 
+    align-items: center; /* Это выровняет всё в одну линию */
     font-size: 0.9rem; 
     margin-bottom: 20px; 
     color: var(--dark);
@@ -751,3 +752,40 @@ textarea#comment-text {
 
 .settings-panel { padding: 24px 20px; width: 100%; }
 .settings-card { background:#fff; padding:28px; border-radius:12px; border:1px solid #e6e6e6; max-width:100%; margin: 0; }
+
+/* Делаем все чекбоксы зелеными */
+.remember-checkbox, .show-pass-checkbox {
+    accent-color: var(--green);
+    cursor: pointer;
+    margin-right: 6px;
+    width: 16px;
+    height: 16px;
+}
+
+/* Делаем текст Remember me жирным */
+.remember-checkbox {
+    font-weight: bold;
+}
+
+/* Полностью переопределяем стили для формы регистрации */
+#signup-form input {
+    margin-bottom: 4px !important; /* Минимальный отступ между полями */
+    padding: 8px 12px !important;  /* Уменьшаем высоту самих полей */
+    height: 35px !important;       /* Фиксированная высота */
+}
+
+#signup-form h2 {
+    margin-bottom: 10px !important; /* Подтягиваем заголовок */
+}
+
+/* Настраиваем блок с чекбоксом в Sign Up */
+#signup-form .show-pass-checkbox {
+    margin-top: 5px !important;
+    margin-bottom: 10px !important;
+}
+
+#signup-form .btn-submit {
+    margin-top: 10px !important;   /* Подтягиваем кнопку */
+    padding: 10px !important;
+}
+
