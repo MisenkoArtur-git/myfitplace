@@ -217,6 +217,7 @@
 
     <script src="{% static 'js/i18n.js' %}"></script>
     <!-- Expose auth state to client scripts -->
+     
     <script>
         window.IS_AUTH = {% if user.is_authenticated %}true{% else %}false{% endif %};
     </script>
