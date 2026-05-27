@@ -36,7 +36,6 @@
     <div class="mobile-toolbar" aria-hidden="true">
         <a class="mobile-item" href="/"><i data-lucide="home"></i><span>Home</span></a>
         <a class="mobile-item" href="/about/"><i data-lucide="info"></i><span>About</span></a>
-        
         {% if user.is_authenticated %}
             <a class="mobile-item" href="/cabinet/"><i data-lucide="user"></i><span>Cabinet</span></a>
             <a class="mobile-item" href="{% url 'logout' %}"><i data-lucide="log-out"></i><span>Logout</span></a>
