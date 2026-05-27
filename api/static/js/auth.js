@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (mt > 0) mt = mt + 18; // extra 18px padding
             }
         } catch (e) { mt = 0; }
-
+        
         // Protect against transient / overscroll-driven huge toolbar heights
         try {
             const maxMobileToolbar = Math.max(48, Math.round(window.innerHeight * 0.2));
