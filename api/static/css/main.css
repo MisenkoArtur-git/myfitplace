@@ -311,7 +311,8 @@ body {
 
 .coach-cards-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    /* Reduce min column width to make coach cards smaller and match client cards */
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 20px;
 }
 
@@ -319,11 +320,12 @@ body {
     background: #FFFFFF;
     border: 1px solid #E0E0E0;
     border-radius: 18px;
-    padding: 20px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    min-height: 320px;
+    gap: 12px;
+    /* Reduce visual size to better match client cards */
+    min-height: 260px;
 }
 
 .coach-card img {

@@ -111,14 +111,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const passEl = formEl.querySelector('input[type="password"][name*="password"]');
         const passConfirmEl = formEl.querySelector('input[type="password"][name*="confirm"]');
-        if (passEl && passEl.value) {
-            if (passEl.value.length < 8) {
+        // Only enforce strong-password rules on signup form (not on login)
+        if (formEl && formEl.id === 'signup-form' && passEl && passEl.value) {
+            const pw = passEl.value;
+            if (pw.length < 8) {
                 passEl.classList.add('input-invalid');
                 showNotification('error', tr('validation.password_short', 'Password must be at least 8 characters.'));
                 return;
             }
+            // require at least one uppercase, one lowercase, one digit and one special char
+            if (!/[A-Z]/.test(pw)) {
+                passEl.classList.add('input-invalid');
+                showNotification('error', 'Пароль должен содержать хотя бы одну заглавную букву.');
+                return;
+            }
+            if (!/[a-z]/.test(pw)) {
+                passEl.classList.add('input-invalid');
+                showNotification('error', 'Пароль должен содержать хотя бы одну строчную букву.');
+                return;
+            }
+            if (!/\d/.test(pw)) {
+                passEl.classList.add('input-invalid');
+                showNotification('error', 'Пароль должен содержать хотя бы одну цифру.');
+                return;
+            }
+            if (!/[!@#$%^&*()_+\-\=\[\]{};':"\\|,.<>\/\?]/.test(pw)) {
+                passEl.classList.add('input-invalid');
+                showNotification('error', 'Пароль должен содержать хотя бы один специальный символ.');
+                return;
+            }
         }
-        if (passEl && passConfirmEl && passEl.value !== passConfirmEl.value) {
+        if (formEl && formEl.id === 'signup-form' && passEl && passConfirmEl && passEl.value !== passConfirmEl.value) {
             passConfirmEl.classList.add('input-invalid');
             showNotification('error', tr('validation.passwords_mismatch', 'Passwords do not match.'));
             return;

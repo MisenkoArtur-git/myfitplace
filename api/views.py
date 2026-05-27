@@ -16,6 +16,16 @@ from .models import User, GymHall, Schedule, Message, Comment, Conversation
 from django.conf import settings
 
 
+def is_valid_phone(value):
+    """Allow empty/null or only digits. Return True if valid."""
+    if value is None:
+        return True
+    v = str(value).strip()
+    if v == '':
+        return True
+    return bool(re.fullmatch(r"\d+", v))
+
+
 def get_avatar_url(user, request):
     """Return absolute avatar URL for a user, or default base_foto.jpg if missing."""
     if getattr(user, 'photo', None):
@@ -65,6 +75,8 @@ def profile_api(request):
             if nickname is not None:
                 user.nickname = nickname
             if phone is not None:
+                if not is_valid_phone(phone):
+                    return JsonResponse({'errors': {'phone': 'Телефон должен содержать только цифры.'}}, status=400)
                 user.phone = phone
             if description is not None:
                 user.description = description
@@ -806,6 +818,10 @@ def client_save_api(request):
         if User.objects.filter(email=email).exists():
             errors['email'] = 'Пользователь с таким email уже существует.'
 
+        # phone must contain only digits
+        if phone and not is_valid_phone(phone):
+            errors['phone'] = 'Телефон должен содержать только цифры.'
+
         if errors:
             return JsonResponse({'errors': errors}, status=400)
 
@@ -845,10 +861,12 @@ def client_save_api(request):
 
         if email:
             if User.objects.filter(email=email).exclude(id=client.id).exists():
-                return JsonResponse({'status': 'error', 'message': 'Email is already used'}, status=400)
+                return JsonResponse({'errors': {'email': 'Email is already used'}}, status=400)
             client.email = email
 
         client.nickname = nickname
+        if phone and not is_valid_phone(phone):
+            return JsonResponse({'errors': {'phone': 'Телефон должен содержать только цифры.'}}, status=400)
         client.phone = phone
         client.description = description
         client.hall = hall
@@ -938,7 +956,7 @@ def coach_save_api(request):
                 pw_msgs.append('Пароль должен содержать хотя бы одну цифру.')
             if not re.search(r"[!@#$%^&*()_+\-=[\]{};':\"\\|,.<>\/?]", password):
                 pw_msgs.append('Пароль должен содержать хотя бы один специальный символ.')
-
+                if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", password): pw_errs.append('Пароль должен содержать хотя бы один специальный символ.')
         if pw_msgs:
             # dedupe
             seen = set(); dedup = []
@@ -949,6 +967,10 @@ def coach_save_api(request):
 
         if User.objects.filter(email=email).exists():
             errors['email'] = 'Пользователь с таким email уже существует.'
+
+        # phone must contain only digits
+        if phone and not is_valid_phone(phone):
+            errors['phone'] = 'Телефон должен содержать только цифры.'
 
         if errors:
             return JsonResponse({'errors': errors}, status=400)
@@ -999,6 +1021,8 @@ def coach_save_api(request):
             coach.email = email
 
         coach.nickname = nickname
+        if phone and not is_valid_phone(phone):
+            return JsonResponse({'errors': {'phone': 'Телефон должен содержать только цифры.'}}, status=400)
         coach.phone = phone
         coach.spec = spec
         coach.description = description

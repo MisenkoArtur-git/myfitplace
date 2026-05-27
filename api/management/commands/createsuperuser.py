@@ -1,16 +1,19 @@
 from django.contrib.auth.management.commands.createsuperuser import Command as BaseCommand
 
+
 class Command(BaseCommand):
     def handle(self, *args, **options):
         super().handle(*args, **options)
-        # Получаем созданного пользователя
+        # Получаем созданного пользователя по email (у нас заменено USERNAME_FIELD)
         from api.models import User
-        # Ищем пользователя по имени, которое было введено в терминале
-        username = options.get('username')
-        user = User.objects.filter(username=username).first()
-        
+        # Base command may provide 'email' or 'username' depending on prompts
+        email = options.get('email') or options.get('username')
+        if not email:
+            return
+        user = User.objects.filter(email=email).first()
+
         if user:
-            # Присваиваем роль админа
-            user.role = 'admin'
+            # Присваиваем роль админа в нужном формате
+            user.role = 'ADMIN'
             user.save()
-            self.stdout.write(self.style.SUCCESS('Роль "admin" успешно назначена пользователю!'))
+            self.stdout.write(self.style.SUCCESS('Роль "ADMIN" успешно назначена пользователю!'))

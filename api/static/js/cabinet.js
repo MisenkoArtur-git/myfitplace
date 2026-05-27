@@ -465,6 +465,7 @@ function openCoachModal(mode, coach = {}) {
                     <input id="coach-email" name="email" type="email" data-i18n="placeholder.email" placeholder="" value="${coach.email || ''}" ${canEdit ? '' : 'required'}>
                     <div class="field-error" id="coach-email-error"></div>
                     <input id="coach-phone" name="phone" type="text" data-i18n="placeholder.phone" placeholder="" value="${coach.phone || ''}">
+                    <div class="field-error" id="coach-phone-error"></div>
                     <input id="coach-password" name="password" type="password" data-i18n="placeholder.password" placeholder="" ${canEdit ? '' : 'required'}>
                     <div class="field-error" id="coach-password-error"></div>
                     <input type="hidden" id="coach-id" name="coach_id" value="${coach.id || ''}">
@@ -529,7 +530,7 @@ function saveCoach(mode) {
     const hallId = document.getElementById('coach-hall')?.value;
     const photoInput = document.getElementById('coach-photo-input');
 
-    // clear previous field errors
+    // Очистка старых ошибок
     ['coach-email','coach-password','coach-last-name','coach-first-name','coach-middle-name'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.remove('input-invalid');
@@ -548,7 +549,16 @@ function saveCoach(mode) {
         return;
     }
 
-    // client-side validation with strict password rules
+    // Phone must contain only digits
+    if (phone && !/^\d+$/.test(phone)) {
+        const phoneEl = document.getElementById('coach-phone');
+        const phoneErr = document.getElementById('coach-phone-error');
+        if (phoneEl) phoneEl.classList.add('input-invalid');
+        if (phoneErr) phoneErr.textContent = 'Телефон должен содержать только цифры.';
+        return;
+    }
+
+    // Валидация email (возвращена)
     const emailRe = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
     if (email && !emailRe.test(email)) {
         document.getElementById('coach-email')?.classList.add('input-invalid');
@@ -556,17 +566,18 @@ function saveCoach(mode) {
         return;
     }
 
-    // password strength check
+    // Проверка силы пароля с поддержкой Unicode (латиница + кириллица)
     const pw = password || '';
     const pwChecks = {
         length: pw.length >= 8,
-        upper: /[A-Z]/.test(pw),
-        lower: /[a-z]/.test(pw),
+        upper: /\p{Lu}/u.test(pw), // Любая заглавная буква (A-Z, А-Я)
+        lower: /\p{Ll}/u.test(pw), // Любая строчная буква (a-z, а-я)
         digit: /\d/.test(pw),
-        special: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pw)
+        special: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(pw)
     };
     const allOk = pwChecks.length && pwChecks.upper && pwChecks.lower && pwChecks.digit && pwChecks.special;
     const pwErrEl = document.getElementById('coach-password-error');
+    
     if (!allOk && pw) {
         pwErrEl.innerHTML = `<ul class="pw-req">
             <li class="${pwChecks.length ? 'met' : 'unmet'}">At least 8 characters</li>
@@ -599,7 +610,6 @@ function saveCoach(mode) {
         refreshCoachList();
     })
     .catch(error => {
-        // if server returned field-level errors, display them
         const data = error && error.data;
         if (data && data.errors) {
             Object.keys(data.errors).forEach(field => {
@@ -611,7 +621,7 @@ function saveCoach(mode) {
             });
             return;
         }
-        showNotification('error', error.message || (window.t ? window.t('server.error', 'Error') : 'Error'));
+        showNotification('error', error.message || 'Error');
     });
 }
 
@@ -847,6 +857,15 @@ function saveClient(mode) {
         return;
     }
 
+    // Phone must contain only digits
+    if (phone && !/^\d+$/.test(phone)) {
+        const phoneEl = document.getElementById('client-phone');
+        const phoneErr = document.getElementById('client-phone-error');
+        if (phoneEl) phoneEl.classList.add('input-invalid');
+        if (phoneErr) phoneErr.textContent = 'Телефон должен содержать только цифры.';
+        return;
+    }
+
     const formData = new FormData();
     formData.append('action', mode === 'edit' ? 'update' : 'create');
     if (clientId) formData.append('id', clientId);
@@ -983,21 +1002,25 @@ function loadCoachesForAttendance() {
         .then(data => {
             coachCache = data.coaches || [];
         })
-        .catch(() => {
-            coachCache = [];
-        });
-}
-
-function renderTrainerOptions(selectId) {
-    const select = document.getElementById(selectId);
-    if (!select) return;
-
-    let html = '<option value="">Select trainer</option>';
-    coachCache.forEach(coach => {
-        html += `<option value="${coach.id}">${coach.nickname || coach.email}</option>`;
+        .catch(error => {
+        const data = error && error.data;
+        if (data && data.errors) {
+            Object.keys(data.errors).forEach(field => {
+                // map server field keys to form input names/ids
+                let fid;
+                if (field === 'password') fid = 'coach-password';
+                else if (field === 'email') fid = 'coach-email';
+                else if (field === 'phone') fid = 'coach-phone';
+                else fid = field;
+                const errEl = document.getElementById(fid + '-error');
+                if (errEl) errEl.textContent = data.errors[field];
+                const input = document.getElementById(fid);
+                if (input) input.classList.add('input-invalid');
+            });
+            return;
+        }
+        showNotification('error', error.message || 'Error');
     });
-
-    select.innerHTML = html;
 }
 
 function addAttendanceRecord() {
@@ -1579,6 +1602,7 @@ function loadSettings() {
                             <label style="display:block; margin-bottom:8px;"><span data-i18n="settings.nickname">Nickname</span><br><input type="text" id="profile-nickname" class="form-input" data-i18n="placeholder.nickname" placeholder=""></label>
                             <label style="display:block; margin-bottom:8px;"><span data-i18n="settings.user_id">User ID</span><br><div id="profile-user-id" class="form-input" style="background:transparent; border:none; padding:6px 0;">&nbsp;</div></label>
                             <label style="display:block; margin-bottom:8px;"><span data-i18n="label.phone">Phone</span><br><input type="text" id="profile-phone" class="form-input" data-i18n="placeholder.phone" placeholder=""></label>
+                            <div class="field-error" id="profile-phone-error"></div>
                             <label style="display:block; margin-bottom:8px;"><span data-i18n="placeholder.description">Description</span><br><textarea id="profile-description" class="form-input" rows="4" data-i18n="placeholder.description" placeholder=""></textarea></label>
                         </div>
                     </div>
@@ -1647,9 +1671,24 @@ function loadSettings() {
 
                     fetchJson('/profile-api/', { method: 'POST', body: fd, headers: {'X-CSRFToken': getCsrfToken()} })
                         .then(res => {
-                            showNotification('success', window.t ? window.t('alert.profile_updated') : 'Profile updated');
+                            showNotification('success', 'Профиль обновлён');
                         })
-                        .catch(err => showNotification('error', err.message || 'Error'));
+                        .catch(err => {
+                            const data = err && err.data;
+                            if (data && data.errors) {
+                                Object.keys(data.errors).forEach(field => {
+                                    const fid = (field === 'phone') ? 'profile-phone' : field;
+                                    const errEl = document.getElementById(fid + '-error');
+                                    const input = document.getElementById(fid);
+                                    if (errEl) errEl.textContent = data.errors[field];
+                                    if (input) input.classList.add('input-invalid');
+                                });
+                                const summary = Object.values(data.errors).flat().slice(0,3).join('; ');
+                                showNotification('error', summary || (err.message || 'Error'));
+                                return;
+                            }
+                            showNotification('error', err.message || 'Error');
+                        });
                 });
             }
         })
